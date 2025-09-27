@@ -1,5 +1,18 @@
-# 📚 CHARUSAT Library Management System
 
+<img width="1512" height="826" alt="Screenshot 2025-09-28 at 4 14 24 AM" src="https://github.com/user-attachments/assets/2142e048-efc4-4469-b991-46d05ae591bf" />
+<img width="1512" height="827" alt="Screenshot 2025-09-28 at 4 15 26 AM" src="https://github.com/user-attachments/assets/880de8b5-2ccf-4d0f-8060-845b1ea10cd5" />
+<img width="1512" height="829" alt="Screenshot 2025-09-28 at 4 15 48 AM" src="https://github.com/user-attachments/assets/131f2fe6-59d5-496f-b9bf-fa1caaa04f88" />
+<img width="1512" height="825" alt="Screenshot 2025-09-28 at 4 16 47 AM" src="https://github.com/user-attachments/assets/78038576-9f94-42aa-8047-dc70a576922f" />
+<img width="1512" height="833" alt="Screenshot 2025-09-28 at 4 17 14 AM" src="https://github.com/user-attachments/assets/ec015fcb-40b3-40e3-bb60-e163622a1a86" />
+<img width="1512" height="824" alt="Screenshot 2025-09-28 at 4 18 08 AM" src="https://github.com/user-attachments/assets/00b791cf-9544-4eaa-ab16-a46902bb4d83" />
+<img width="1508" height="826" alt="Screenshot 2025-09-28 at 4 18 32 AM" src="https://github.com/user-attachments/assets/5eb0bfaa-19d5-4d14-8cfd-05eb6bda1d0b" />
+<img width="1512" height="823" alt="Screenshot 2025-09-28 at 4 19 30 AM" src="https://github.com/user-attachments/assets/47635b26-ee5c-48c5-be0e-e8ba94aa6735" />
+<img width="1512" height="828" alt="Screenshot 2025-09-28 at 4 19 49 AM" src="https://github.com/user-attachments/assets/3d2566e8-f72f-4704-af72-9d2bd1d43658" />
+<img width="1512" height="827" alt="Screenshot 2025-09-28 at 4 21 14 AM" src="https://github.com/user-attachments/assets/7c4cff00-6d14-49d6-8798-5796f9c4e5dc" />
+
+
+
+# 📚 CHARUSAT Library Management System
 **A Modern Full-Stack Library Management System for CHARUSAT University**
 
 ## 🎯 Project Overview
@@ -72,11 +85,53 @@ mongod
 - Backend API: http://localhost:5000
 
 
-Team Leader	Dev Vadariya	Frontend development, UI/UX design, testing Full-stack development
-Team Member	Dhyey Thummar	architecture design, project management
+<table>
+  <thead>
+    <tr>
+      <th>Position</th>
+      <th>Name</th>
+      <th>Responsibilities</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Team Leader</td>
+      <td>Dev Vadariya</td>
+      <td>Frontend development, UI/UX design, testing, Full-stack development</td>
+    </tr>
+    <tr>
+      <td>Team Member</td>
+      <td>Dhyey Thummar</td>
+      <td>Architecture design, project management</td>
+    </tr>
+  </tbody>
+</table>
 
-Role	      Email	                     Password
-Admin	      admin@charusat.ac.in	     Admin@123456
-Librarian  	librarian@charusat.ac.in	 Librarian@123456
-Student	    student@charusat.ac.in	   Student@123456
+
+<table>
+  <thead>
+    <tr>
+      <th>Role</th>
+      <th>Email</th>
+      <th>Password</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Admin</td>
+      <td>admin@charusat.ac.in</td>
+      <td>Admin@123456</td>
+    </tr>
+    <tr>
+      <td>Librarian</td>
+      <td>librarian@charusat.ac.in</td>
+      <td>Librarian@123456</td>
+    </tr>
+    <tr>
+      <td>Student</td>
+      <td>student@charusat.ac.in</td>
+      <td>Student@123456</td>
+    </tr>
+  </tbody>
+</table>
 
