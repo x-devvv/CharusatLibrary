@@ -122,8 +122,6 @@ const searchBooks = asyncHandler(async (req, res, next) => {
 // @access  Public
 const getBook = asyncHandler(async (req, res, next) => {
   const book = await Book.findById(req.params.id)
-    .populate('authors', 'name biography nationality')
-    .populate('genre', 'name description color')
     .populate('reviews.userId', 'name')
     .populate('currentBorrowings', 'userId borrowDate dueDate')
     .populate('reservations', 'userId reservationDate position');
@@ -144,6 +142,9 @@ const getBook = asyncHandler(async (req, res, next) => {
 // @route   POST /api/books
 // @access  Private (Admin/Librarian)
 const createBook = asyncHandler(async (req, res, next) => {
+  console.log('📚 CREATE BOOK REQUEST:');
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  
   const {
     title,
     authors,
@@ -161,17 +162,25 @@ const createBook = asyncHandler(async (req, res, next) => {
     price,
   } = req.body;
 
-  // Validate authors exist
-  const validAuthors = await Author.find({ _id: { $in: authors }, isActive: true });
-  if (validAuthors.length !== authors.length) {
-    return next(new AppError('One or more authors not found', 400));
+  // Simple validation - no complex ID lookups
+  if (!title) {
+    return next(new AppError('Title is required', 400));
+  }
+  if (!authors) {
+    return next(new AppError('At least one author is required', 400));
+  }
+  if (!isbn) {
+    return next(new AppError('Please provide a valid ISBN', 400));
+  }
+  if (!genre) {
+    return next(new AppError('Genre is required', 400));
   }
 
-  // Validate genre exists
-  const validGenre = await Category.findById(genre);
-  if (!validGenre || !validGenre.isActive) {
-    return next(new AppError('Genre not found', 400));
-  }
+  // Simple author handling - just store as string
+  const authorString = Array.isArray(authors) ? authors.join(', ') : authors;
+
+  // Simple genre handling - just store as string  
+  const genreString = genre;
 
   // Check if ISBN already exists
   if (isbn) {
@@ -183,16 +192,16 @@ const createBook = asyncHandler(async (req, res, next) => {
 
   const bookData = {
     title,
-    authors,
+    authors: authorString, // Store author as simple string
     isbn,
-    genre,
+    genre: genreString, // Store genre as simple string
     publishDate,
     publisher,
     edition,
     language,
     pages,
-    copies,
-    availableCopies: copies, // Initially all copies are available
+    copies: copies || 1, // Default to 1 if not provided
+    availableCopies: copies || 1, // Initially all copies are available
     description,
     location,
     tags,
@@ -200,8 +209,7 @@ const createBook = asyncHandler(async (req, res, next) => {
   };
 
   const book = await Book.create(bookData);
-  await book.populate('authors', 'name');
-  await book.populate('genre', 'name color');
+  // No need to populate since authors and genre are now simple strings
 
   res.status(201).json({
     success: true,
@@ -239,21 +247,8 @@ const updateBook = asyncHandler(async (req, res, next) => {
     price,
   } = req.body;
 
-  // Validate authors if provided
-  if (authors) {
-    const validAuthors = await Author.find({ _id: { $in: authors }, isActive: true });
-    if (validAuthors.length !== authors.length) {
-      return next(new AppError('One or more authors not found', 400));
-    }
-  }
-
-  // Validate genre if provided
-  if (genre) {
-    const validGenre = await Category.findById(genre);
-    if (!validGenre || !validGenre.isActive) {
-      return next(new AppError('Genre not found', 400));
-    }
-  }
+  // Simple validation - just check if values are provided
+  // No complex ID validation needed
 
   // Check ISBN uniqueness if changed
   if (isbn && isbn !== book.isbn) {
@@ -297,8 +292,7 @@ const updateBook = asyncHandler(async (req, res, next) => {
   });
 
   await book.save();
-  await book.populate('authors', 'name');
-  await book.populate('genre', 'name color');
+  // No need to populate since authors and genre are now simple strings
 
   res.status(200).json({
     success: true,

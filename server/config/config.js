@@ -34,8 +34,17 @@ module.exports = {
   // Security Configuration
   BCRYPT_SALT_ROUNDS: parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12,
   RATE_LIMIT: {
-    WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900000, // 15 minutes
-    MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+    // General API rate limiting - Development phase with 1-minute refresh
+    WINDOW_MS: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
+    MAX_REQUESTS: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100000, // 100K requests per minute for development
+    
+    // Auth endpoints - Also 1-minute refresh for development
+    AUTH_WINDOW_MS: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
+    AUTH_MAX_REQUESTS: parseInt(process.env.AUTH_RATE_LIMIT_MAX_REQUESTS) || 10000, // 10K auth attempts per minute for development
+    
+    // Sensitive operations - Also 1-minute refresh for development
+    STRICT_WINDOW_MS: parseInt(process.env.STRICT_RATE_LIMIT_WINDOW_MS) || 60000, // 1 minute
+    STRICT_MAX_REQUESTS: parseInt(process.env.STRICT_RATE_LIMIT_MAX_REQUESTS) || 5000, // 5K attempts per minute for development
   },
 
   // Admin Configuration
@@ -53,6 +62,7 @@ module.exports = {
     ADMIN: 'admin',
     LIBRARIAN: 'librarian',
     MEMBER: 'member',
+    STUDENT: 'student',
   },
 
   // Transaction Status

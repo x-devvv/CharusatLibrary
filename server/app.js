@@ -45,6 +45,9 @@ const corsOptions = {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
+    // Debug logging
+    console.log('CORS Origin received:', origin);
+    
     const allowedOrigins = [
       'http://localhost:3000',
       'http://localhost:3001',
@@ -59,9 +62,19 @@ const corsOptions = {
       allowedOrigins.push(process.env.FRONTEND_URL);
     }
     
+    // In development, be more permissive
+    if (config.NODE_ENV === 'development') {
+      if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        console.log('Allowing development origin:', origin);
+        return callback(null, true);
+      }
+    }
+    
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
+      console.log('Allowed origins:', allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -89,28 +102,60 @@ const limiter = rateLimit({
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.',
+    retryAfter: Math.ceil(config.RATE_LIMIT.WINDOW_MS / 1000), // seconds
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting for health checks, static assets, and development mode
+    return req.path === '/health' || 
+           req.path.startsWith('/static/') ||
+           config.NODE_ENV === 'development';
+  },
 });
 
 app.use('/api/', limiter);
 
-// Stricter rate limiting for auth routes (relaxed for development)
+// Stricter rate limiting for auth routes
 const authLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: config.RATE_LIMIT.AUTH_WINDOW_MS,
+  max: config.RATE_LIMIT.AUTH_MAX_REQUESTS,
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.',
+    retryAfter: Math.ceil(config.RATE_LIMIT.AUTH_WINDOW_MS / 1000),
   },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting in development mode
+    return config.NODE_ENV === 'development';
+  },
 });
 
+// Very strict rate limiting for sensitive operations
+const strictLimiter = rateLimit({
+  windowMs: config.RATE_LIMIT.STRICT_WINDOW_MS,
+  max: config.RATE_LIMIT.STRICT_MAX_REQUESTS,
+  message: {
+    success: false,
+    message: 'Too many attempts for this operation, please wait before trying again.',
+    retryAfter: Math.ceil(config.RATE_LIMIT.STRICT_WINDOW_MS / 1000),
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => {
+    // Skip rate limiting in development mode
+    return config.NODE_ENV === 'development';
+  },
+});
+
+// Apply rate limiting to specific routes
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/forgot-password', strictLimiter);
+app.use('/api/auth/reset-password', strictLimiter);
+app.use('/api/auth/verify-email', strictLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

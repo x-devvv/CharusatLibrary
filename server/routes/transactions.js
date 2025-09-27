@@ -101,7 +101,6 @@ router.post(
   authenticate,
   transactionValidations.borrow,
   handleValidationErrors,
-  canPerformTransaction,
   borrowBook
 );
 

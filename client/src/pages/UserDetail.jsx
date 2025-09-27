@@ -98,6 +98,7 @@ export default function UserDetail() {
       case 'admin': return 'text-red-400 bg-red-900/30'
       case 'librarian': return 'text-blue-400 bg-blue-900/30'
       case 'member': return 'text-green-400 bg-green-900/30'
+      case 'student': return 'text-purple-400 bg-purple-900/30'
       default: return 'text-gray-400 bg-gray-900/30'
     }
   }
@@ -131,7 +132,7 @@ export default function UserDetail() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto pt-6 space-y-6">
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           <Link to="/admin/users">
@@ -141,11 +142,11 @@ export default function UserDetail() {
         </div>
         <div className="flex gap-2">
           {!editing && (
-            <Button onClick={() => setEditing(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => setEditing(true)} className="btn-primary">
               Edit User
             </Button>
           )}
-          <Button onClick={deleteUser} className="bg-red-600 hover:bg-red-700">
+          <Button onClick={deleteUser} className="btn-destructive">
             Delete User
           </Button>
         </div>
@@ -192,9 +193,10 @@ export default function UserDetail() {
                 <Label className="text-gray-200">Role</Label>
                 <select
                   className="h-10 px-3 rounded-md border border-gray-700 bg-[#020617]/50 text-gray-200 text-sm w-full"
-                  value={editForm.role || 'member'}
+                  value={editForm.role || 'student'}
                   onChange={e => handleEditChange('role', e.target.value)}
                 >
+                  <option value="student">Student</option>
                   <option value="member">Member</option>
                   <option value="librarian">Librarian</option>
                   <option value="admin">Admin</option>
@@ -237,10 +239,10 @@ export default function UserDetail() {
             </div>
 
             <div className="flex gap-2 pt-4">
-              <Button onClick={updateUser} className="bg-green-600 hover:bg-green-700">
+              <Button onClick={updateUser} className="btn-success">
                 Save Changes
               </Button>
-              <Button onClick={() => setEditing(false)} variant="secondary">
+              <Button onClick={() => setEditing(false)} variant="secondary" className="btn-secondary">
                 Cancel
               </Button>
             </div>

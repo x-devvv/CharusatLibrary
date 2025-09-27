@@ -1,8 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { request } from '../lib/api'
 import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { useAuth } from '../hooks/useAuth'
+import transactionService from '../services/transactionService'
+import { 
+  Calendar, Clock, DollarSign, AlertTriangle, CheckCircle, XCircle, 
+  RefreshCw, ArrowLeft, User, BookOpen, CreditCard, History, 
+  MapPin, Phone, Mail, Hash, Shield, Award, TrendingUp, Star
+} from 'lucide-react'
 
 export default function TransactionDetail() {
   const { id } = useParams()
@@ -12,6 +21,10 @@ export default function TransactionDetail() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState({})
+
+  const isAdminOrLibrarian = user?.role === 'admin' || user?.role === 'librarian'
+  const isOwner = transaction?.userId?._id === user?._id
 
   useEffect(() => {
     if (id) {
@@ -22,7 +35,7 @@ export default function TransactionDetail() {
   async function loadTransaction() {
     setLoading(true)
     try {
-      const response = await request(`/transactions/${id}`)
+      const response = await transactionService.getTransaction(id)
       setTransaction(response.data?.transaction)
       setError('')
     } catch (e) {
@@ -33,312 +46,524 @@ export default function TransactionDetail() {
     }
   }
 
-  async function returnBook() {
+  async function handleReturnBook() {
+    setActionLoading(prev => ({ ...prev, return: true }))
     try {
-      await request(`/transactions/${id}/return`, { 
-        method: 'PUT',
-        body: JSON.stringify({ condition: 'good' })
-      })
-      setSuccess('Book returned successfully!')
-      await loadTransaction()
+      await transactionService.returnBook(id)
+      setSuccess('Book returned successfully')
+      loadTransaction()
     } catch (e) {
       setError(e.message)
     }
-  }
-
-  async function renewBook() {
-    try {
-      await request(`/transactions/${id}/renew`, { method: 'PUT' })
-      setSuccess('Book renewed successfully!')
-      await loadTransaction()
-    } catch (e) {
-      setError(e.message)
+    finally {
+      setActionLoading(prev => ({ ...prev, return: false }))
     }
   }
 
-  async function payFine() {
+  async function handleRenewBook() {
+    setActionLoading(prev => ({ ...prev, renew: true }))
     try {
-      await request(`/transactions/${id}/pay-fine`, { method: 'PUT' })
-      setSuccess('Fine paid successfully!')
-      await loadTransaction()
+      await transactionService.renewBook(id)
+      setSuccess('Book renewed successfully')
+      loadTransaction()
     } catch (e) {
       setError(e.message)
     }
+    finally {
+      setActionLoading(prev => ({ ...prev, renew: false }))
+    }
   }
 
-  const getStatusColor = (status, dueDate) => {
-    if (status === 'returned') return 'text-green-400 bg-green-900/30'
-    if (status === 'borrowed' && new Date(dueDate) < new Date()) return 'text-red-400 bg-red-900/30'
-    if (status === 'borrowed') return 'text-blue-400 bg-blue-900/30'
-    return 'text-gray-400 bg-gray-900/30'
+  async function handlePayFine() {
+    const fine = transactionService.calculateFine(transaction.dueDate)
+    setActionLoading(prev => ({ ...prev, pay: true }))
+    try {
+      await transactionService.payFine(id, { amount: fine })
+      setSuccess('Fine paid successfully')
+      loadTransaction()
+    } catch (e) {
+      setError(e.message)
+    }
+    finally {
+      setActionLoading(prev => ({ ...prev, pay: false }))
+    }
   }
 
-  const isOverdue = (dueDate) => {
-    return new Date(dueDate) < new Date()
+  function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
 
-  const getDaysOverdue = (dueDate) => {
-    const due = new Date(dueDate)
-    const now = new Date()
-    const diffTime = now - due
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
-  }
-
-  const getDaysUntilDue = (dueDate) => {
-    const due = new Date(dueDate)
-    const now = new Date()
-    const diffTime = due - now
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
+  function getStatusBadge(status) {
+    const statusInfo = transactionService.formatTransactionStatus(status)
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
+        {statusInfo.label}
+      </span>
+    )
   }
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto"></div>
-          <div className="text-gray-400 mt-2">Loading transaction details...</div>
-        </div>
+      <div className="max-w-6xl mx-auto py-8">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center"
+        >
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
+          <div className="text-gray-400 mt-4 text-lg">Loading transaction details...</div>
+        </motion.div>
+      </div>
+    )
+  }
+
+  if (error && !transaction) {
+    return (
+      <div className="max-w-6xl mx-auto py-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center text-gray-400"
+        >
+          <XCircle className="h-16 w-16 mx-auto text-red-400 mb-6" />
+          <h2 className="text-2xl font-semibold mb-4">Transaction Not Found</h2>
+          <p className="text-lg mb-6">{error}</p>
+          <Button onClick={() => navigate(-1)} className="btn-secondary">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
+        </motion.div>
       </div>
     )
   }
 
   if (!transaction) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="max-w-6xl mx-auto py-8">
         <div className="text-center text-gray-400">
-          <div className="text-lg mb-2">Transaction not found</div>
-          <div className="text-sm mb-4">{error}</div>
-          <Link to="/transactions">
-            <Button variant="secondary">← Back to Transactions</Button>
-          </Link>
+          <p className="text-lg">No transaction data available</p>
         </div>
       </div>
     )
   }
 
-  const overdue = isOverdue(transaction.dueDate) && transaction.status === 'borrowed'
-  const daysOverdue = overdue ? getDaysOverdue(transaction.dueDate) : 0
-  const daysUntilDue = !overdue && transaction.status === 'borrowed' ? getDaysUntilDue(transaction.dueDate) : 0
-  const canRenew = transaction.status === 'borrowed' && !overdue && transaction.renewalCount < 2
-  const isOwnTransaction = user._id === transaction.userId?._id || user._id === transaction.userId
-  const canManage = user.role === 'admin' || user.role === 'librarian'
+  const isOverdue = transactionService.isOverdue(transaction.dueDate) && transaction.status === 'borrowed'
+  const fine = isOverdue ? transactionService.calculateFine(transaction.dueDate) : 0
+  const daysUntilDue = transactionService.getDaysUntilDue(transaction.dueDate)
+  const canRenew = transaction.renewalCount < 2 && transaction.status === 'borrowed' && !isOverdue
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Link to={canManage ? "/admin/manage-transactions" : "/transactions"}>
-          <Button variant="secondary">← Back to Transactions</Button>
-        </Link>
-        <h1 className="text-3xl font-bold text-white">Transaction Details</h1>
-      </div>
-
-      {error && <div className="rounded-md border border-red-400 bg-red-900/30 p-3 text-sm text-red-200">{error}</div>}
-      {success && <div className="rounded-md border border-green-400 bg-green-900/30 p-3 text-sm text-green-200">{success}</div>}
-
-      {/* Transaction Information */}
-      <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-white">Transaction Information</h2>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(transaction.status, transaction.dueDate)}`}>
-            {overdue ? 'OVERDUE' : transaction.status?.toUpperCase()}
-          </span>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Book Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-white">Book Details</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-gray-300">Title</label>
-                <Link to={`/books/${transaction.bookId?._id || transaction.bookId}`}>
-                  <div className="text-white hover:text-blue-400 transition-colors">
-                    {transaction.bookId?.title || 'Unknown Book'}
-                  </div>
-                </Link>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Author(s)</label>
-                <div className="text-white">
-                  {transaction.bookId?.authors?.map(author => author.name || author).join(', ') || 'Unknown Author'}
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">ISBN</label>
-                <div className="text-white">{transaction.bookId?.isbn || 'N/A'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Category</label>
-                <div className="text-white">
-                  {transaction.bookId?.category?.name || transaction.bookId?.genre || 'Uncategorized'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* User Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-medium text-white">Borrower Details</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-sm font-medium text-gray-300">Name</label>
-                {canManage ? (
-                  <Link to={`/admin/users/${transaction.userId?._id || transaction.userId}`}>
-                    <div className="text-blue-400 hover:text-blue-300 transition-colors">
-                      {transaction.userId?.name || 'Unknown User'}
-                    </div>
-                  </Link>
-                ) : (
-                  <div className="text-white">{transaction.userId?.name || 'Unknown User'}</div>
-                )}
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Email</label>
-                <div className="text-white">{transaction.userId?.email || 'No email'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Phone</label>
-                <div className="text-white">{transaction.userId?.phone || 'No phone'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Role</label>
-                <div className="text-white capitalize">{transaction.userId?.role || 'Unknown'}</div>
-              </div>
-            </div>
+    <div className="max-w-7xl mx-auto pt-4 space-y-4 min-w-[1000px]">
+      {/* Professional Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <div className="flex items-center gap-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="btn-secondary flex items-center"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold text-white">Transaction Details</h1>
+            <p className="text-lg text-gray-300 mt-1">Transaction ID: {transaction._id}</p>
           </div>
         </div>
-      </div>
-
-      {/* Transaction Timeline */}
-      <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Transaction Timeline</h2>
-        
-        <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium text-gray-300">Borrowed Date</label>
-              <div className="text-white">{new Date(transaction.borrowDate).toLocaleDateString()}</div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-300">Due Date</label>
-              <div className={overdue ? 'text-red-400 font-medium' : 'text-white'}>
-                {new Date(transaction.dueDate).toLocaleDateString()}
-              </div>
-            </div>
-            {transaction.returnDate && (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-300">Returned Date</label>
-                  <div className="text-green-400">{new Date(transaction.returnDate).toLocaleDateString()}</div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-300">Return Condition</label>
-                  <div className="text-white capitalize">{transaction.returnCondition || 'Good'}</div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Status Information */}
-          <div className="border-t border-gray-700 pt-4">
-            {overdue && (
-              <div className="bg-red-900/20 border border-red-800 rounded p-3 mb-3">
-                <div className="text-red-400 font-medium">
-                  ⚠️ This book is {daysOverdue} days overdue
-                </div>
-              </div>
-            )}
-            
-            {!overdue && transaction.status === 'borrowed' && (
-              <div className="bg-blue-900/20 border border-blue-800 rounded p-3 mb-3">
-                <div className="text-blue-400">
-                  📅 {daysUntilDue} days remaining until due date
-                </div>
-              </div>
-            )}
-
-            {transaction.renewalCount > 0 && (
-              <div className="bg-yellow-900/20 border border-yellow-800 rounded p-3 mb-3">
-                <div className="text-yellow-400">
-                  🔄 This book has been renewed {transaction.renewalCount} time{transaction.renewalCount !== 1 ? 's' : ''}
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="flex items-center space-x-2">
+          {getStatusBadge(transaction.status)}
         </div>
-      </div>
+      </motion.div>
 
-      {/* Fine Information */}
-      {transaction.fineAmount > 0 && (
-        <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-          <h2 className="text-xl font-semibold text-white mb-4">Fine Information</h2>
-          
-          <div className="bg-red-900/20 border border-red-800 rounded p-4">
-            <div className="flex justify-between items-center">
-              <div>
-                <div className="text-red-400 font-medium text-lg">
-                  Fine Amount: ${transaction.fineAmount}
-                </div>
-                <div className="text-gray-400 text-sm">
-                  Status: {transaction.finePaid ? 'Paid' : 'Unpaid'}
-                </div>
-                {transaction.finePaidDate && (
-                  <div className="text-gray-400 text-sm">
-                    Paid on: {new Date(transaction.finePaidDate).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-              {!transaction.finePaid && (isOwnTransaction || canManage) && (
-                <Button 
-                  onClick={payFine} 
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  Pay Fine
-                </Button>
-              )}
-            </div>
+      {/* Enhanced Alerts */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="rounded-lg border border-red-400/50 bg-red-900/30 p-4 text-sm text-red-200 backdrop-blur-sm"
+        >
+          <div className="flex items-center">
+            <XCircle className="h-5 w-5 text-red-400 mr-3" />
+            <span>{error}</span>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Actions */}
-      <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-        <h2 className="text-xl font-semibold text-white mb-4">Actions</h2>
-        
-        <div className="flex gap-3 flex-wrap">
-          {transaction.status === 'borrowed' && canManage && (
-            <Button 
-              onClick={returnBook} 
-              className="bg-green-600 hover:bg-green-700"
+      {success && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="rounded-lg border border-green-400/50 bg-green-900/30 p-4 text-sm text-green-200 backdrop-blur-sm"
+        >
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
+            <span>{success}</span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Actions and Book Info */}
+        <div className="lg:col-span-2 space-y-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <Card className="card-elevated border-gray-700/30">
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-4">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <BookOpen className="h-8 w-8 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-xl font-bold text-white mb-3">
+                      {transaction.bookId?.title || 'Unknown Book'}
+                    </h2>
+                    <div className="grid grid-cols-2 gap-3 text-sm text-gray-300 mb-4">
+                      <div className="bg-gray-800/50 p-3 rounded-lg">
+                        <div className="flex items-center gap-1 mb-1">
+                          <User className="h-3 w-3 text-blue-400" />
+                          <span className="font-semibold text-gray-200 text-xs">Author:</span>
+                        </div>
+                        <div className="text-white text-sm">{transaction.bookId?.author || 'Unknown'}</div>
+                      </div>
+                      <div className="bg-gray-800/50 p-3 rounded-lg">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Award className="h-3 w-3 text-purple-400" />
+                          <span className="font-semibold text-gray-200 text-xs">Genre:</span>
+                        </div>
+                        <div className="text-white text-sm">{transaction.bookId?.genre || 'Unknown'}</div>
+                      </div>
+                      <div className="bg-gray-800/50 p-3 rounded-lg">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Hash className="h-3 w-3 text-green-400" />
+                          <span className="font-semibold text-gray-200 text-xs">ISBN:</span>
+                        </div>
+                        <div className="text-white font-mono text-xs">{transaction.bookId?.isbn || 'N/A'}</div>
+                      </div>
+                      <div className="bg-gray-800/50 p-3 rounded-lg">
+                        <div className="flex items-center gap-1 mb-1">
+                          <Shield className="h-3 w-3 text-orange-400" />
+                          <span className="font-semibold text-gray-200 text-xs">Publisher:</span>
+                        </div>
+                        <div className="text-white text-sm">{transaction.bookId?.publisher || 'Unknown'}</div>
+                      </div>
+                    </div>
+                    {transaction.bookId?.description && (
+                      <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-700">
+                        <h3 className="text-base font-semibold text-white mb-2">Description</h3>
+                        <p className="text-gray-200 text-sm leading-relaxed">{transaction.bookId.description}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Actions Section */}
+          {transaction && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
             >
-              Mark as Returned
-            </Button>
-          )}
-          
-          {canRenew && (isOwnTransaction || canManage) && (
-            <Button 
-              onClick={renewBook} 
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              Renew Book ({2 - transaction.renewalCount} renewals left)
-            </Button>
+              <Card className="card-elevated border-gray-700/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+                    <div className="p-2 bg-green-500/20 rounded-lg">
+                      <TrendingUp className="h-5 w-5 text-green-400" />
+                    </div>
+                    Actions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {isAdminOrLibrarian && (
+                      <Button
+                        onClick={handleReturnBook}
+                        disabled={actionLoading.return}
+                        className="w-full btn-primary flex items-center justify-center"
+                      >
+                        {actionLoading.return ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 mr-2" />
+                        )}
+                        Return Book
+                      </Button>
+                    )}
+                    
+                    {canRenew && (isOwner || isAdminOrLibrarian) && (
+                      <Button
+                        variant="outline"
+                        onClick={handleRenewBook}
+                        disabled={actionLoading.renew}
+                        className="w-full btn-secondary flex items-center justify-center"
+                      >
+                        {actionLoading.renew ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Renew Book
+                      </Button>
+                    )}
+                    
+                    {fine > 0 && (isOwner || isAdminOrLibrarian) && (
+                      <Button
+                        variant="outline"
+                        onClick={handlePayFine}
+                        disabled={actionLoading.pay}
+                        className="w-full flex items-center justify-center border-red-400/50 text-red-400 hover:bg-red-900/20"
+                      >
+                        {actionLoading.pay ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <CreditCard className="h-4 w-4 mr-2" />
+                        )}
+                        Pay Fine (${fine})
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
 
-          {canManage && (
-            <Link to={`/admin/users/${transaction.userId?._id || transaction.userId}`}>
-              <Button variant="secondary">
-                View User Profile
-              </Button>
-            </Link>
+          {/* Enhanced Transaction Timeline */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Card className="card-elevated border-gray-700/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+                  <div className="p-2 bg-yellow-500/20 rounded-lg">
+                    <History className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  Transaction Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-2 bg-blue-500/20 rounded-full">
+                      <CheckCircle className="h-5 w-5 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-base font-semibold text-white">Book Borrowed</p>
+                      <p className="text-sm text-gray-400">{formatDate(transaction.borrowDate)}</p>
+                    </div>
+                  </div>
+                  
+                  {transaction.renewalHistory && transaction.renewalHistory.length > 0 && (
+                    transaction.renewalHistory.map((renewal, index) => (
+                      <div key={index} className="flex items-start space-x-4">
+                        <div className="p-2 bg-yellow-500/20 rounded-full">
+                          <RefreshCw className="h-5 w-5 text-yellow-400" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-base font-semibold text-white">Book Renewed</p>
+                          <p className="text-sm text-gray-400">{formatDate(renewal.date)}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  
+                  {transaction.returnDate && (
+                    <div className="flex items-start space-x-4">
+                      <div className="p-2 bg-green-500/20 rounded-full">
+                        <CheckCircle className="h-5 w-5 text-green-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-base font-semibold text-white">Book Returned</p>
+                        <p className="text-sm text-gray-400">{formatDate(transaction.returnDate)}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+
+        {/* Enhanced Sidebar */}
+        <div className="space-y-4">
+          {/* User Information */}
+          {isAdminOrLibrarian && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <Card className="card-elevated border-gray-700/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+                    <div className="p-2 bg-purple-500/20 rounded-lg">
+                      <User className="h-5 w-5 text-purple-400" />
+                    </div>
+                    Borrower Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <User className="h-4 w-4 text-blue-400" />
+                        <span className="font-semibold text-gray-200">Name:</span>
+                      </div>
+                      <div className="text-white">{transaction.userId?.name || 'Unknown'}</div>
+                    </div>
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Mail className="h-4 w-4 text-green-400" />
+                        <span className="font-semibold text-gray-200">Email:</span>
+                      </div>
+                      <div className="text-white">{transaction.userId?.email || 'Unknown'}</div>
+                    </div>
+                    {transaction.userId?.phone && (
+                      <div className="bg-gray-800/50 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Phone className="h-4 w-4 text-yellow-400" />
+                          <span className="font-semibold text-gray-200">Phone:</span>
+                        </div>
+                        <div className="text-white">{transaction.userId.phone}</div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           )}
 
-          <Link to={`/books/${transaction.bookId?._id || transaction.bookId}`}>
-            <Button variant="secondary">
-              View Book Details
-            </Button>
-          </Link>
+          {/* Enhanced Transaction Details */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <Card className="card-elevated border-gray-700/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Hash className="h-5 w-5 text-blue-400" />
+                  </div>
+                  Transaction Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="h-4 w-4 text-green-400" />
+                      <span className="font-semibold text-gray-200">Borrow Date:</span>
+                    </div>
+                    <div className="text-white">{formatDate(transaction.borrowDate)}</div>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-400" />
+                      <span className="font-semibold text-gray-200">Due Date:</span>
+                    </div>
+                    <div className={`${isOverdue ? 'text-red-400' : 'text-white'}`}>
+                      {formatDate(transaction.dueDate)}
+                    </div>
+                  </div>
+                  {transaction.returnDate && (
+                    <div className="bg-gray-800/50 p-4 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="h-4 w-4 text-green-400" />
+                        <span className="font-semibold text-gray-200">Return Date:</span>
+                      </div>
+                      <div className="text-white">{formatDate(transaction.returnDate)}</div>
+                    </div>
+                  )}
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-4 w-4 text-blue-400" />
+                      <span className="font-semibold text-gray-200">Renewals:</span>
+                    </div>
+                    <div className="text-white">{transaction.renewalCount}/2</div>
+                  </div>
+                  {fine > 0 && (
+                    <div className="bg-gray-800/50 p-4 rounded-lg border border-red-400/30">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-4 w-4 text-red-400" />
+                        <span className="font-semibold text-gray-200">Fine Amount:</span>
+                      </div>
+                      <div className="text-red-400 font-bold text-lg">${fine}</div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Enhanced Status Information */}
+          {transaction.status === 'borrowed' && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Card className="card-elevated border-gray-700/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+                    <div className="p-2 bg-yellow-500/20 rounded-lg">
+                      <Clock className="h-5 w-5 text-yellow-400" />
+                    </div>
+                    Status Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {isOverdue ? (
+                      <div className="flex items-center text-red-400 p-4 bg-red-900/20 rounded-lg border border-red-400/30">
+                        <AlertTriangle className="h-6 w-6 mr-3" />
+                        <div>
+                          <p className="font-semibold text-lg">Overdue</p>
+                          <p className="text-sm">{Math.abs(daysUntilDue)} days past due</p>
+                        </div>
+                      </div>
+                    ) : daysUntilDue <= 3 ? (
+                      <div className="flex items-center text-yellow-400 p-4 bg-yellow-900/20 rounded-lg border border-yellow-400/30">
+                        <Clock className="h-6 w-6 mr-3" />
+                        <div>
+                          <p className="font-semibold text-lg">Due Soon</p>
+                          <p className="text-sm">Due in {daysUntilDue} days</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center text-green-400 p-4 bg-green-900/20 rounded-lg border border-green-400/30">
+                        <CheckCircle className="h-6 w-6 mr-3" />
+                        <div>
+                          <p className="font-semibold text-lg">On Time</p>
+                          <p className="text-sm">Due in {daysUntilDue} days</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+
+
         </div>
       </div>
     </div>

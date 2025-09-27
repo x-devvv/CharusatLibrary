@@ -4,25 +4,27 @@ import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
 import VerifyEmail from './pages/VerifyEmail'
-import Dashboard from './pages/Dashboard'
 import Profile from './pages/Profile'
 import Books from './pages/Books'
 import Transactions from './pages/Transactions'
 import ProtectedRoute from './components/ProtectedRoute'
 import RoleGuard from './components/RoleGuard'
 import DashboardLayout from './components/DashboardLayout'
-import { useAuth } from './hooks/useAuth'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import AdminUsers from './pages/AdminUsers'
 import UserDetail from './pages/UserDetail'
-import Categories from './pages/Categories'
-import Authors from './pages/Authors'
 import Reservations from './pages/Reservations'
+import ManageReservations from './pages/ManageReservations'
+import ReservationDetail from './pages/ReservationDetail'
 import ManageBooks from './pages/ManageBooks'
 import ManageTransactions from './pages/ManageTransactions'
 import BookDetail from './pages/BookDetail'
 import TransactionDetail from './pages/TransactionDetail'
+import RateLimitToast from './components/RateLimitToast'
+import RequestQueueIndicator from './components/RequestQueueIndicator'
+import ErrorBoundary from './components/ErrorBoundary'
 
-export default function App(){
+function AppContent(){
   const { user, loading } = useAuth()
   
   if (loading) {
@@ -61,21 +63,14 @@ export default function App(){
         <div className="relative z-10">
           <Routes>
         {/* Public routes */}
-        <Route path="/" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
-        <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
-        <Route path="/forgot-password" element={user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />} />
-        <Route path="/reset-password/:token" element={user ? <Navigate to="/dashboard" replace /> : <ResetPassword />} />
+        <Route path="/" element={user ? <Navigate to="/books" replace /> : <Login />} />
+        <Route path="/login" element={user ? <Navigate to="/books" replace /> : <Login />} />
+        <Route path="/register" element={user ? <Navigate to="/books" replace /> : <Register />} />
+        <Route path="/forgot-password" element={user ? <Navigate to="/books" replace /> : <ForgotPassword />} />
+        <Route path="/reset-password/:token" element={user ? <Navigate to="/books" replace /> : <ResetPassword />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
         
         {/* Protected routes with dashboard layout */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <DashboardLayout>
-              <Dashboard />
-            </DashboardLayout>
-          </ProtectedRoute>
-        } />
         
         <Route path="/profile" element={
           <ProtectedRoute>
@@ -92,6 +87,7 @@ export default function App(){
             </DashboardLayout>
           </ProtectedRoute>
         } />
+        
         
         <Route path="/books/:id" element={
           <ProtectedRoute>
@@ -125,10 +121,18 @@ export default function App(){
           </ProtectedRoute>
         } />
         
+        <Route path="/reservations/:id" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <ReservationDetail />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
+        
         {/* Admin/Librarian routes */}
         <Route path="/admin/users" element={
           <ProtectedRoute>
-            <RoleGuard allowedRoles={['admin']}>
+            <RoleGuard user={user} roles={['admin']}>
               <DashboardLayout>
                 <AdminUsers />
               </DashboardLayout>
@@ -138,7 +142,7 @@ export default function App(){
         
         <Route path="/admin/users/:id" element={
           <ProtectedRoute>
-            <RoleGuard allowedRoles={['admin', 'librarian']}>
+            <RoleGuard user={user} roles={['admin', 'librarian']}>
               <DashboardLayout>
                 <UserDetail />
               </DashboardLayout>
@@ -146,25 +150,6 @@ export default function App(){
           </ProtectedRoute>
         } />
         
-        <Route path="/admin/categories" element={
-          <ProtectedRoute>
-            <RoleGuard allowedRoles={['admin']}>
-              <DashboardLayout>
-                <Categories />
-              </DashboardLayout>
-            </RoleGuard>
-          </ProtectedRoute>
-        } />
-        
-        <Route path="/admin/authors" element={
-          <ProtectedRoute>
-            <RoleGuard user={user} roles={['admin','librarian']}>
-              <DashboardLayout>
-                <Authors />
-              </DashboardLayout>
-            </RoleGuard>
-          </ProtectedRoute>
-        } />
         
         <Route path="/admin/books" element={
           <ProtectedRoute>
@@ -185,9 +170,33 @@ export default function App(){
             </RoleGuard>
           </ProtectedRoute>
         } />
+        
+        <Route path="/admin/reservations" element={
+          <ProtectedRoute>
+            <RoleGuard user={user} roles={['admin','librarian']}>
+              <DashboardLayout>
+                <ManageReservations />
+              </DashboardLayout>
+            </RoleGuard>
+          </ProtectedRoute>
+        } />
           </Routes>
         </div>
+        
+        {/* Global UI Components */}
+        <RateLimitToast />
+        <RequestQueueIndicator />
       </BrowserRouter>
     </div>
+  )
+}
+
+export default function App(){
+  return (
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }

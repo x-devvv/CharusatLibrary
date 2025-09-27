@@ -106,7 +106,7 @@ export default function VerifyEmail(){
           
           <div className="mt-6 space-y-2">
             <Link to="/login">
-              <Button className="w-full bg-indigo-600 hover:bg-indigo-700">
+              <Button className="w-full btn-primary">
                 Go to Login
               </Button>
             </Link>

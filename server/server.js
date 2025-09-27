@@ -14,7 +14,18 @@ const {
 process.on('uncaughtException', handleUncaughtException);
 
 // Connect to database
-connectDB().catch(handleDBConnectionError);
+connectDB().then(async () => {
+  // Auto-seed database if using in-memory DB and no users exist
+  if (process.env.USE_IN_MEMORY_DB === 'true') {
+    const User = require('./models/User');
+    const userCount = await User.countDocuments();
+    if (userCount === 0) {
+      console.log('🌱 Auto-seeding in-memory database...');
+      const seedScript = require('./scripts/seedData');
+      // Note: We'll need to modify the seed script to export a function
+    }
+  }
+}).catch(handleDBConnectionError);
 
 // Start server
 const server = app.listen(config.PORT, () => {

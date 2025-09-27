@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { motion } from 'framer-motion'
 import { request } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
-import { Label } from '../components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { useAuth } from '../hooks/useAuth'
+import transactionService from '../services/transactionService'
+import { 
+  Calendar, Clock, DollarSign, AlertTriangle, CheckCircle, XCircle, 
+  RefreshCw, Eye, Search, BookOpen, Plus, CreditCard, TrendingUp, 
+  Library, User, Shield, ArrowRight, Star, MapPin, Award
+} from 'lucide-react'
 
 export default function Transactions(){
   const { user } = useAuth()
@@ -14,26 +22,50 @@ export default function Transactions(){
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
-  const [viewMode, setViewMode] = useState('my-transactions') // my-transactions, borrow-books
+  const [actionLoading, setActionLoading] = useState({})
+  const [viewMode, setViewMode] = useState('my-transactions')
+  const [selectedBook, setSelectedBook] = useState(null)
+  const [showBorrowModal, setShowBorrowModal] = useState(false)
 
   useEffect(() => { 
-    loadActiveTransactions()
-    if (viewMode === 'borrow-books') {
+    if (viewMode === 'my-transactions') {
+      loadActiveTransactions()
+    } else if (viewMode === 'borrow-books') {
       loadAvailableBooks()
     }
-  }, [viewMode])
+  }, [viewMode, user])
+
+  useEffect(() => {
+    if (user?._id) {
+      loadActiveTransactions()
+    }
+  }, [user])
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (viewMode === 'borrow-books') loadAvailableBooks()
+    }, 300)
+    return () => clearTimeout(delayedSearch)
+  }, [searchQuery])
 
   async function loadActiveTransactions() {
+    if (!user?._id) {
+      console.log('User not authenticated, skipping transactions load')
+      return
+    }
     setLoading(true)
     try {
-      const response = await request(`/transactions/user/${user._id}/active`)
-      setActiveTransactions(response.data?.transactions || [])
+      console.log('📚 Loading active transactions for user:', user._id)
+      const response = await transactionService.getUserActiveTransactions(user._id)
+      console.log('📊 Active transactions response:', response)
+      const transactions = response.data?.transactions || []
+      console.log('✅ Active transactions found:', transactions.length)
+      setActiveTransactions(transactions)
       setError('')
     } catch (e) {
-      console.error('Active transactions load error:', e)
+      console.error('❌ Active transactions load error:', e)
       setError(e.message)
-    }
-    finally {
+    } finally {
       setLoading(false)
     }
   }
@@ -41,20 +73,23 @@ export default function Transactions(){
   async function loadAvailableBooks() {
     setLoading(true)
     try {
+      console.log('📖 Loading available books...')
       const response = await request('/books')
       const books = response.data?.books || []
-      // Filter only available books
-      const available = books.filter(book => 
-        book.status === 'available' && 
-        book.availableCopies > 0 &&
-        (!searchQuery || 
-          book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          book.authors?.some(author => 
-            (author.name || author).toLowerCase().includes(searchQuery.toLowerCase())
-          ) ||
-          book.isbn?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-      )
+      console.log('📊 Total books received:', books.length)
+      
+      const available = books.filter(book => {
+        const isActive = book.isActive !== false
+        const hasAvailableCopies = book.availableCopies > 0
+        const matchesSearch = !searchQuery || 
+          book.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (typeof book.authors === 'string' ? book.authors : book.authors?.[0] || '')?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          book.genre?.toLowerCase().includes(searchQuery.toLowerCase())
+        
+        return isActive && hasAvailableCopies && matchesSearch
+      })
+      
+      console.log('✅ Available books after filtering:', available.length)
       setAvailableBooks(available)
       setError('')
     } catch (e) {
@@ -66,278 +101,487 @@ export default function Transactions(){
     }
   }
 
-  async function borrowBook(bookId) {
+  async function handleBorrowBook(bookId) {
+    setActionLoading(prev => ({ ...prev, [bookId]: 'borrowing' }))
     try {
-      await request('/transactions/borrow', { 
-        method: 'POST', 
-        body: JSON.stringify({ bookId }) 
-      })
+      console.log('📚 Borrowing book:', bookId)
+      await transactionService.borrowBook(bookId)
       setSuccess('Book borrowed successfully!')
+      
       await loadActiveTransactions()
       await loadAvailableBooks()
+      
+      setShowBorrowModal(false)
+      setSelectedBook(null)
+      
+      window.dispatchEvent(new CustomEvent('transactionUpdate', { detail: { type: 'borrow', bookId } }))
+      console.log('✅ Book borrow process completed')
     } catch (e) {
+      console.error('❌ Borrow error:', e)
       setError(e.message)
+    }
+    finally {
+      setActionLoading(prev => ({ ...prev, [bookId]: null }))
     }
   }
 
-  async function renewBook(transactionId) {
+  async function handleRenewBook(transactionId) {
+    setActionLoading(prev => ({ ...prev, [transactionId]: 'renewing' }))
     try {
-      await request(`/transactions/${transactionId}/renew`, { 
-        method: 'PUT' 
-      })
+      await transactionService.renewBook(transactionId)
       setSuccess('Book renewed successfully!')
-      await loadActiveTransactions()
+      loadActiveTransactions()
     } catch (e) {
       setError(e.message)
     }
+    finally {
+      setActionLoading(prev => ({ ...prev, [transactionId]: null }))
+    }
   }
 
-  async function payFine(transactionId) {
+  async function handlePayFine(transactionId, amount) {
+    setActionLoading(prev => ({ ...prev, [transactionId]: 'paying' }))
     try {
-      await request(`/transactions/${transactionId}/pay-fine`, { 
-        method: 'PUT' 
-      })
+      await transactionService.payFine(transactionId, { amount })
       setSuccess('Fine paid successfully!')
-      await loadActiveTransactions()
+      loadActiveTransactions()
     } catch (e) {
       setError(e.message)
     }
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'borrowed': return 'text-blue-400 bg-blue-900/30'
-      case 'overdue': return 'text-red-400 bg-red-900/30'
-      case 'returned': return 'text-green-400 bg-green-900/30'
-      default: return 'text-gray-400 bg-gray-900/30'
+    finally {
+      setActionLoading(prev => ({ ...prev, [transactionId]: null }))
     }
   }
 
-  const isOverdue = (dueDate) => {
-    return new Date(dueDate) < new Date()
+  function formatDate(dateString) {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
   }
 
-  const getDaysUntilDue = (dueDate) => {
-    const due = new Date(dueDate)
-    const now = new Date()
-    const diffTime = due - now
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays
+  function getStatusBadge(status) {
+    const statusInfo = transactionService.formatTransactionStatus(status)
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
+        {statusInfo.label}
+      </span>
+    )
   }
 
-  return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">My Transactions</h1>
-        <div className="flex gap-2">
-          <Button 
-            onClick={() => setViewMode('my-transactions')} 
-            variant={viewMode === 'my-transactions' ? 'default' : 'secondary'}
-          >
-            My Books
-          </Button>
-          <Button 
-            onClick={() => setViewMode('borrow-books')} 
-            variant={viewMode === 'borrow-books' ? 'default' : 'secondary'}
-          >
-            Borrow Books
-          </Button>
+  function getDueDateInfo(dueDate, status) {
+    if (status === 'returned') return null
+    
+    const daysUntilDue = transactionService.getDaysUntilDue(dueDate)
+    const isOverdue = transactionService.isOverdue(dueDate)
+    
+    if (isOverdue) {
+      const fine = transactionService.calculateFine(dueDate)
+      return (
+        <div className="flex items-center text-red-400 text-sm">
+          <AlertTriangle className="h-4 w-4 mr-1" />
+          {Math.abs(daysUntilDue)} days overdue (${fine} fine)
         </div>
+      )
+    } else if (daysUntilDue <= 3) {
+      return (
+        <div className="flex items-center text-yellow-400 text-sm">
+          <Clock className="h-4 w-4 mr-1" />
+          Due in {daysUntilDue} days
+        </div>
+      )
+    }
+    return (
+      <div className="flex items-center text-gray-400 text-sm">
+        <Calendar className="h-4 w-4 mr-1" />
+        Due {formatDate(dueDate)}
       </div>
+    )
+  }
 
-      {error && <div className="rounded-md border border-red-400 bg-red-900/30 p-3 text-sm text-red-200">{error}</div>}
-      {success && <div className="rounded-md border border-green-400 bg-green-900/30 p-3 text-sm text-green-200">{success}</div>}
+  const TransactionCard = ({ transaction }) => {
+    const isOverdue = transactionService.isOverdue(transaction.dueDate) && transaction.status === 'borrowed'
+    const fine = isOverdue ? transactionService.calculateFine(transaction.dueDate) : 0
+    const canRenew = transaction.renewalCount < 2 && transaction.status === 'borrowed' && !isOverdue
 
-      {viewMode === 'my-transactions' ? (
-        // My Active Transactions
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-white">Active Borrowed Books</h2>
-            <Button onClick={loadActiveTransactions} disabled={loading} size="sm">
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </div>
-
-          {loading && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto"></div>
-              <div className="text-gray-400 mt-2">Loading transactions...</div>
-            </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {activeTransactions.map(transaction => {
-              const daysUntilDue = getDaysUntilDue(transaction.dueDate)
-              const overdue = isOverdue(transaction.dueDate)
-              
-              return (
-                <div key={transaction._id} className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-4 space-y-3">
-                  <div>
-                    <Link to={`/books/${transaction.book?._id || transaction.bookId}`}>
-                      <h3 className="font-medium text-lg text-white hover:text-blue-400 transition-colors">
-                        {transaction.book?.title || 'Unknown Book'}
-                      </h3>
-                    </Link>
-                    <p className="text-gray-300 text-sm">
-                      {transaction.book?.authors?.map(author => author.name || author).join(', ') || 'Unknown Author'}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Borrowed:</span>
-                      <span className="text-white">{new Date(transaction.borrowDate).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Due:</span>
-                      <span className={overdue ? 'text-red-400 font-medium' : 'text-white'}>
-                        {new Date(transaction.dueDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-400">Status:</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(overdue ? 'overdue' : transaction.status)}`}>
-                        {overdue ? 'OVERDUE' : transaction.status?.toUpperCase()}
-                      </span>
-                    </div>
-                    {overdue ? (
-                      <div className="text-red-400 text-xs font-medium">
-                        {Math.abs(daysUntilDue)} days overdue
-                      </div>
-                    ) : (
-                      <div className="text-gray-400 text-xs">
-                        {daysUntilDue} days remaining
-                      </div>
-                    )}
-                  </div>
-
-                  {transaction.fineAmount > 0 && (
-                    <div className="bg-red-900/20 border border-red-800 rounded p-2">
-                      <div className="text-red-400 text-sm font-medium">
-                        Fine: ${transaction.fineAmount}
-                      </div>
-                      {!transaction.finePaid && (
-                        <Button 
-                          onClick={() => payFine(transaction._id)} 
-                          size="sm" 
-                          className="mt-2 bg-red-600 hover:bg-red-700 w-full"
-                        >
-                          Pay Fine
-                        </Button>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2 pt-2">
-                    {!overdue && transaction.renewalCount < 2 && (
-                      <Button 
-                        onClick={() => renewBook(transaction._id)} 
-                        size="sm" 
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        Renew ({2 - transaction.renewalCount} left)
-                      </Button>
-                    )}
-                    <Link to={`/transactions/${transaction._id}`}>
-                      <Button size="sm" variant="secondary">
-                        View Details
-                      </Button>
-                    </Link>
-                  </div>
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="card-elevated border-gray-700/30"
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                  <BookOpen className="h-4 w-4 text-blue-400" />
                 </div>
-              )
-            })}
-          </div>
-
-          {!loading && activeTransactions.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-lg mb-2">No active transactions</div>
-              <div className="text-sm mb-4">You haven't borrowed any books yet.</div>
-              <Button onClick={() => setViewMode('borrow-books')}>
-                Browse Books to Borrow
-              </Button>
-            </div>
-          )}
-        </div>
-      ) : (
-        // Borrow Books View
-        <div className="space-y-4">
-          <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-4">
-            <div className="flex gap-4 items-end">
-              <div className="flex-1 space-y-2">
-                <Label className="text-gray-200">Search Books</Label>
-                <Input 
-                  placeholder="Search by title, author, or ISBN..." 
-                  value={searchQuery} 
-                  onChange={e => setSearchQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && loadAvailableBooks()}
-                />
-              </div>
-              <Button onClick={loadAvailableBooks} disabled={loading}>
-                Search
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-white">Available Books</h2>
-            <div className="text-gray-400 text-sm">
-              {availableBooks.length} book{availableBooks.length !== 1 ? 's' : ''} available
-            </div>
-          </div>
-
-          {loading && (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto"></div>
-              <div className="text-gray-400 mt-2">Loading available books...</div>
-            </div>
-          )}
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {availableBooks.map(book => (
-              <div key={book._id} className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-4 space-y-3">
                 <div>
-                  <Link to={`/books/${book._id}`}>
-                    <h3 className="font-medium text-lg text-white hover:text-blue-400 transition-colors line-clamp-2">
-                      {book.title}
-                    </h3>
-                  </Link>
+                  <h3 className="text-lg font-bold text-white">
+                    {transaction.bookId?.title || 'Unknown Book'}
+                  </h3>
                   <p className="text-gray-300 text-sm">
-                    {book.authors?.map(author => author.name || author).join(', ') || 'Unknown Author'}
+                    by {transaction.bookId?.author || 'Unknown Author'}
                   </p>
                 </div>
-
-                <div className="space-y-1 text-sm text-gray-400">
-                  <div><strong>ISBN:</strong> {book.isbn || 'N/A'}</div>
-                  <div><strong>Category:</strong> {book.category?.name || book.genre || 'Uncategorized'}</div>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="px-2 py-1 rounded-full text-xs font-medium text-green-400 bg-green-900/30">
-                    {book.availableCopies} Available
-                  </span>
-                </div>
-
-                <Button 
-                  onClick={() => borrowBook(book._id)} 
-                  className="w-full bg-indigo-600 hover:bg-indigo-700"
-                  disabled={book.availableCopies === 0}
-                >
-                  Borrow Book
-                </Button>
               </div>
-            ))}
-          </div>
-
-          {!loading && availableBooks.length === 0 && (
-            <div className="text-center py-12 text-gray-400">
-              <div className="text-lg mb-2">No books available</div>
-              <div className="text-sm">
-                {searchQuery ? 'Try a different search term' : 'All books are currently borrowed'}
+              <div className="bg-gray-800/50 p-2 rounded-lg mb-3">
+                <div className="text-xs text-gray-300">
+                  <span className="font-semibold text-gray-200">ISBN:</span> {transaction.bookId?.isbn || 'N/A'}
+                </div>
               </div>
             </div>
+            <div className="flex flex-col items-end space-y-2">
+              {getStatusBadge(transaction.status)}
+              {getDueDateInfo(transaction.dueDate, transaction.status)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 text-sm text-gray-300 mb-4">
+            <div className="bg-gray-800/30 p-2 rounded-lg">
+              <div className="flex items-center gap-1 mb-1">
+                <Calendar className="h-3 w-3 text-green-400" />
+                <span className="font-semibold text-gray-200 text-xs">Borrowed:</span>
+              </div>
+              <div className="text-white text-sm">{formatDate(transaction.borrowDate)}</div>
+            </div>
+            <div className="bg-gray-800/30 p-2 rounded-lg">
+              <div className="flex items-center gap-1 mb-1">
+                <Clock className="h-3 w-3 text-yellow-400" />
+                <span className="font-semibold text-gray-200 text-xs">Due:</span>
+              </div>
+              <div className="text-white text-sm">{formatDate(transaction.dueDate)}</div>
+            </div>
+            {transaction.returnDate && (
+              <div className="bg-gray-800/30 p-2 rounded-lg">
+                <div className="flex items-center gap-1 mb-1">
+                  <CheckCircle className="h-3 w-3 text-green-400" />
+                  <span className="font-semibold text-gray-200 text-xs">Returned:</span>
+                </div>
+                <div className="text-white text-sm">{formatDate(transaction.returnDate)}</div>
+              </div>
+            )}
+            <div className="bg-gray-800/30 p-2 rounded-lg">
+              <div className="flex items-center gap-1 mb-1">
+                <RefreshCw className="h-3 w-3 text-blue-400" />
+                <span className="font-semibold text-gray-200 text-xs">Renewals:</span>
+              </div>
+              <div className="text-white text-sm">{transaction.renewalCount}/2</div>
+            </div>
+          </div>
+
+          {transaction.status === 'borrowed' && (
+            <div className="flex flex-wrap gap-3">
+              {canRenew && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleRenewBook(transaction._id)}
+                  disabled={actionLoading[transaction._id] === 'renewing'}
+                  className="btn-secondary flex items-center"
+                >
+                  {actionLoading[transaction._id] === 'renewing' ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Renew Book
+                </Button>
+              )}
+              
+              {fine > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handlePayFine(transaction._id, fine)}
+                  disabled={actionLoading[transaction._id] === 'paying'}
+                  className="flex items-center text-red-400 border-red-400/50 hover:bg-red-900/20"
+                >
+                  {actionLoading[transaction._id] === 'paying' ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CreditCard className="h-4 w-4 mr-2" />
+                  )}
+                  Pay Fine (${fine})
+                </Button>
+              )}
+              
+              <Link to={`/transactions/${transaction._id}`}>
+                <Button size="sm" variant="outline" className="btn-secondary flex items-center">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Details
+                </Button>
+              </Link>
+            </div>
           )}
+        </CardContent>
+      </motion.div>
+    )
+  }
+
+  const BookCard = ({ book }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="card-elevated border-gray-700/30 group hover:scale-[1.02] transition-all duration-300"
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-1.5 bg-green-500/20 rounded-lg">
+                <BookOpen className="h-4 w-4 text-green-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white group-hover:text-green-400 transition-colors">
+                  {book.title}
+                </h3>
+                <p className="text-gray-300 text-sm">by {book.author}</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1 mb-3">
+              <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                {book.genre}
+              </Badge>
+              <Badge variant="success" className="text-xs px-2 py-0.5">
+                Available
+              </Badge>
+            </div>
+            <div className="bg-gray-800/50 p-2 rounded-lg mb-3">
+              <div className="text-xs text-gray-300">
+                <span className="font-semibold text-gray-200">Available:</span> {book.availableCopies} copies
+              </div>
+            </div>
+          </div>
         </div>
+
+        <div className="flex justify-between items-center">
+          <Link to={`/books/${book._id}`}>
+            <Button size="sm" variant="outline" className="btn-secondary flex items-center text-xs px-3 py-1">
+              <Eye className="h-3 w-3 mr-1" />
+              View Details
+            </Button>
+          </Link>
+          <Button
+            size="sm"
+            onClick={() => handleBorrowBook(book._id)}
+            disabled={actionLoading[book._id] === 'borrowing'}
+            className="btn-primary flex items-center text-xs px-3 py-1"
+          >
+            {actionLoading[book._id] === 'borrowing' ? (
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <Plus className="h-3 w-3 mr-1" />
+            )}
+            Borrow Book
+          </Button>
+        </div>
+      </CardContent>
+    </motion.div>
+  )
+
+  return (
+    <div className="max-w-7xl mx-auto pt-4 space-y-4 min-w-[900px]">
+      {/* Professional Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold text-white">My Transactions</h1>
+          <p className="text-lg text-gray-300">Manage your borrowed books and library transactions</p>
+        </div>
+        <Button 
+          onClick={() => {
+            if (viewMode === 'my-transactions') {
+              loadActiveTransactions()
+            } else {
+              loadAvailableBooks()
+            }
+          }} 
+          disabled={loading}
+          variant="outline"
+          className="btn-secondary flex items-center"
+        >
+          {loading ? (
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          Refresh
+        </Button>
+      </motion.div>
+
+      {/* Enhanced View Mode Tabs */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <div className="flex space-x-1 bg-gray-800/50 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setViewMode('my-transactions')}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
+              viewMode === 'my-transactions' 
+                ? 'bg-blue-600 text-white shadow-lg' 
+                : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+            }`}
+          >
+            <Library className="h-4 w-4" />
+            My Books
+          </button>
+          <button
+            onClick={() => setViewMode('borrow-books')}
+            className={`px-4 py-2 rounded-md text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
+              viewMode === 'borrow-books' 
+                ? 'bg-blue-600 text-white shadow-lg' 
+                : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/50'
+            }`}
+          >
+            <Plus className="h-4 w-4" />
+            Borrow Books
+          </button>
+        </div>
+      </motion.div>
+
+      {/* Enhanced Alerts */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="rounded-lg border border-red-400/50 bg-red-900/30 p-4 text-sm text-red-200 backdrop-blur-sm"
+        >
+          <div className="flex items-center">
+            <XCircle className="h-5 w-5 text-red-400 mr-3" />
+            <span>{error}</span>
+          </div>
+        </motion.div>
+      )}
+
+      {success && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="rounded-lg border border-green-400/50 bg-green-900/30 p-4 text-sm text-green-200 backdrop-blur-sm"
+        >
+          <div className="flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
+            <span>{success}</span>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Enhanced Search for Borrow Books */}
+      {viewMode === 'borrow-books' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Search books by title, author, or genre..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-2 input-field"
+            />
+          </div>
+        </motion.div>
+      )}
+
+      {/* Enhanced Content */}
+      {loading ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-16"
+        >
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
+          <p className="text-gray-400 mt-4 text-lg">Loading...</p>
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="space-y-4"
+        >
+          {viewMode === 'my-transactions' && (
+            <>
+              {activeTransactions.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-16"
+                >
+                  <div className="max-w-md mx-auto">
+                    <BookOpen className="h-16 w-16 mx-auto text-gray-600 mb-6" />
+                    <h3 className="text-2xl font-semibold text-gray-300 mb-4">No Active Transactions</h3>
+                    <p className="text-gray-400 mb-6">You haven't borrowed any books yet.</p>
+                    <Button 
+                      className="btn-primary" 
+                      onClick={() => setViewMode('borrow-books')}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Browse Available Books
+                    </Button>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="space-y-3">
+                  {activeTransactions.map((transaction, index) => (
+                    <motion.div
+                      key={transaction._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <TransactionCard transaction={transaction} />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {viewMode === 'borrow-books' && (
+            <>
+              {availableBooks.length === 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-16"
+                >
+                  <div className="max-w-md mx-auto">
+                    <BookOpen className="h-16 w-16 mx-auto text-gray-600 mb-6" />
+                    <h3 className="text-2xl font-semibold text-gray-300 mb-4">No Books Available</h3>
+                    <p className="text-gray-400 mb-6">
+                      {searchQuery ? 'Try adjusting your search terms.' : 'All books are currently borrowed.'}
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {availableBooks.map((book, index) => (
+                    <motion.div
+                      key={book._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <BookCard book={book} />
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </motion.div>
       )}
     </div>
   )

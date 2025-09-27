@@ -1,30 +1,30 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { request } from '../lib/api'
-import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
-import { Label } from '../components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
 import { useAuth } from '../hooks/useAuth'
+import { BookOpen, ArrowLeft, Star, Calendar, MapPin, Users, Clock, Shield, Award, BookMarked } from 'lucide-react'
 
 export default function BookDetail(){
   const { id } = useParams()
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [book, setBook] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
-  const [rating, setRating] = useState(5)
-  const [comment, setComment] = useState('')
-  const [reviewLoading, setReviewLoading] = useState(false)
 
   async function load(){ 
     setLoading(true)
     try{ 
+      console.log('Loading book with ID:', id)
       const r = await request(`/books/${id}`)
+      console.log('Book API response:', r)
       setBook(r.data?.book || null)
       setError('')
     }catch(e){ 
+      console.error('Error loading book:', e)
       setError(e.message) 
     }
     finally {
@@ -35,30 +35,6 @@ export default function BookDetail(){
   useEffect(()=>{ 
     if (id) load() 
   },[id])
-
-  async function addReview(){ 
-    if (!comment.trim()) {
-      setError('Please enter a comment for your review')
-      return
-    }
-    
-    setReviewLoading(true)
-    try{ 
-      await request(`/books/${id}/reviews`, { 
-        method: 'POST', 
-        body: JSON.stringify({ rating: Number(rating), comment: comment.trim() }) 
-      })
-      setComment('')
-      setRating(5)
-      setSuccess('Review added successfully!')
-      await load() 
-    }catch(e){ 
-      setError(e.message) 
-    }
-    finally {
-      setReviewLoading(false)
-    }
-  }
 
   const getAvailabilityColor = (available, total) => {
     const ratio = available / total
@@ -77,10 +53,10 @@ export default function BookDetail(){
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="max-w-6xl mx-auto py-8">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto"></div>
-          <div className="text-gray-400 mt-2">Loading book details...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto"></div>
+          <div className="text-gray-400 mt-4 text-lg">Loading book details...</div>
         </div>
       </div>
     )
@@ -88,12 +64,15 @@ export default function BookDetail(){
 
   if (!book) {
     return (
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="max-w-6xl mx-auto py-8">
         <div className="text-center text-gray-400">
-          <div className="text-lg mb-2">Book not found</div>
-          <div className="text-sm mb-4">{error}</div>
+          <div className="text-2xl mb-4 font-semibold">Book not found</div>
+          <div className="text-lg mb-6">{error}</div>
           <Link to="/books">
-            <Button variant="secondary">← Back to Books</Button>
+            <Button variant="secondary" className="btn-secondary">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Books
+            </Button>
           </Link>
         </div>
       </div>
@@ -105,162 +84,283 @@ export default function BookDetail(){
     : 0
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
+    <div className="max-w-6xl mx-auto pt-6 space-y-8 min-w-[800px]">
+      {/* Professional Header */}
+      <div className="flex items-center gap-6">
         <Link to="/books">
-          <Button variant="secondary">← Back to Books</Button>
+          <Button variant="secondary" className="btn-secondary">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Books
+          </Button>
         </Link>
-        <h1 className="text-3xl font-bold text-white">Book Details</h1>
-      </div>
-
-      {error && <div className="rounded-md border border-red-400 bg-red-900/30 p-3 text-sm text-red-200">{error}</div>}
-      {success && <div className="rounded-md border border-green-400 bg-green-900/30 p-3 text-sm text-green-200">{success}</div>}
-
-      {/* Book Information */}
-      <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-        <div className="grid gap-6 md:grid-cols-3">
-          {/* Book Cover Placeholder */}
-          <div className="md:col-span-1">
-            <div className="aspect-[3/4] bg-gray-800 rounded-lg flex items-center justify-center">
-              <div className="text-center text-gray-400">
-                <div className="text-4xl mb-2">📚</div>
-                <div className="text-sm">Book Cover</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Book Details */}
-          <div className="md:col-span-2 space-y-4">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-2">{book.title}</h2>
-              <p className="text-lg text-gray-300">
-                by {book.authors?.map(author => author.name || author).join(', ') || 'Unknown Author'}
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium text-gray-300">ISBN</label>
-                <div className="text-white">{book.isbn || 'Not available'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Publisher</label>
-                <div className="text-white">{book.publisher || 'Unknown'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Category</label>
-                <div className="text-white">{book.category?.name || book.genre || 'Uncategorized'}</div>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-300">Publication Year</label>
-                <div className="text-white">{book.publicationYear || 'Unknown'}</div>
-              </div>
-            </div>
-
-            <div className="flex justify-between items-center">
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getAvailabilityColor(book.availableCopies, book.copies)}`}>
-                {book.availableCopies || 0} / {book.copies || 0} Available
-              </span>
-              <div className="text-sm text-gray-400">
-                {book.status === 'available' ? '📚 Available for borrowing' : '🚫 Currently unavailable'}
-              </div>
-            </div>
-
-            {/* Rating */}
-            {book.reviews?.length > 0 && (
-              <div className="flex items-center gap-2">
-                <div className="flex">{renderStars(Math.round(averageRating))}</div>
-                <span className="text-white font-medium">{averageRating.toFixed(1)}</span>
-                <span className="text-gray-400 text-sm">({book.reviews.length} review{book.reviews.length !== 1 ? 's' : ''})</span>
-              </div>
-            )}
-
-            {book.description && (
-              <div>
-                <label className="text-sm font-medium text-gray-300">Description</label>
-                <p className="text-white mt-1 leading-relaxed">{book.description}</p>
-              </div>
-            )}
-          </div>
+        <div className="flex-1">
+          <h1 className="text-4xl font-bold text-white">Book Details</h1>
+          <p className="text-xl text-gray-300 mt-2">Comprehensive information about this book</p>
         </div>
       </div>
 
-      {/* Add Review Section */}
-      {user && (
-        <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-          <h3 className="text-xl font-semibold text-white mb-4">Add Your Review</h3>
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-gray-200">Rating</Label>
-                <select 
-                  className="h-10 px-3 rounded-md border border-gray-700 bg-[#020617]/50 text-gray-200 text-sm w-full"
-                  value={rating} 
-                  onChange={e => setRating(Number(e.target.value))}
-                >
-                  <option value={5}>5 - Excellent</option>
-                  <option value={4}>4 - Very Good</option>
-                  <option value={3}>3 - Good</option>
-                  <option value={2}>2 - Fair</option>
-                  <option value={1}>1 - Poor</option>
-                </select>
-              </div>
-              <div className="flex items-center">
-                <div className="flex text-2xl">{renderStars(rating)}</div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label className="text-gray-200">Comment</Label>
-              <textarea 
-                className="min-h-20 px-3 py-2 rounded-md border border-gray-700 bg-[#020617]/50 text-gray-200 text-sm w-full"
-                placeholder="Share your thoughts about this book..."
-                value={comment} 
-                onChange={e => setComment(e.target.value)}
-                rows={3}
-              />
-            </div>
-            
-            <Button 
-              onClick={addReview} 
-              disabled={reviewLoading || !comment.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700"
-            >
-              {reviewLoading ? 'Submitting...' : 'Submit Review'}
-            </Button>
-          </div>
+      {error && (
+        <div className="rounded-lg border border-red-400/50 bg-red-900/30 p-4 text-sm text-red-200 backdrop-blur-sm">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="rounded-lg border border-green-400/50 bg-green-900/30 p-4 text-sm text-green-200 backdrop-blur-sm">
+          {success}
         </div>
       )}
 
-      {/* Reviews Section */}
-      <div className="bg-[#020617]/30 backdrop-blur-sm rounded-lg border border-gray-800 p-6">
-        <h3 className="text-xl font-semibold text-white mb-4">
-          Reviews ({book.reviews?.length || 0})
-        </h3>
-        
-        {book.reviews?.length > 0 ? (
-          <div className="space-y-4">
-            {book.reviews.map((review, index) => (
-              <div key={index} className="border border-gray-700 rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="flex">{renderStars(review.rating)}</div>
-                    <span className="text-white font-medium">{review.rating}/5</span>
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {review.user?.name || 'Anonymous'} • {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'Recently'}
+      {/* Main Book Information Card */}
+      <div>
+        <Card className="card-elevated border-gray-700/30">
+          <CardContent className="p-8">
+            <div className="grid gap-8 lg:grid-cols-3">
+              {/* Book Cover */}
+              <div className="lg:col-span-1">
+                <div className="aspect-[3/4] bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center border border-gray-700 shadow-2xl">
+                  <div className="text-center text-gray-400">
+                    <BookOpen className="h-16 w-16 mx-auto mb-4 text-blue-400" />
+                    <div className="text-lg font-semibold">Book Cover</div>
+                    <div className="text-sm text-gray-500">Cover image not available</div>
                   </div>
                 </div>
-                <p className="text-gray-200">{review.comment}</p>
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-400">
-            <div className="text-lg mb-2">No reviews yet</div>
-            <div className="text-sm">Be the first to review this book!</div>
-          </div>
-        )}
+
+              {/* Book Details */}
+              <div className="lg:col-span-2 space-y-6">
+                <div>
+                  <h2 className="text-3xl font-bold text-white mb-3 leading-tight">{book.title}</h2>
+                  <p className="text-xl text-gray-300 mb-6">
+                    by {book.authors || 'Unknown Author'}
+                  </p>
+                  
+                  <div className="flex flex-wrap gap-3 mb-6">
+                    <Badge variant="secondary" className="text-sm px-4 py-2 font-medium">
+                      {book.genre || 'Uncategorized'}
+                    </Badge>
+                    <Badge 
+                      variant={book.availableCopies > 0 ? 'success' : 'destructive'}
+                      className="text-sm px-4 py-2 font-medium"
+                    >
+                      {book.availableCopies || 0} / {book.copies || 0} Available
+                    </Badge>
+                    {book.reviews?.length > 0 && (
+                      <Badge variant="outline" className="text-sm px-4 py-2 font-medium">
+                        <Star className="h-3 w-3 mr-1" />
+                        {averageRating.toFixed(1)} ({book.reviews.length} reviews)
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                {/* Key Information Grid */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BookMarked className="h-4 w-4 text-blue-400" />
+                      <label className="text-sm font-semibold text-gray-300">ISBN</label>
+                    </div>
+                    <div className="text-white font-mono text-sm">{book.isbn || 'Not available'}</div>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award className="h-4 w-4 text-purple-400" />
+                      <label className="text-sm font-semibold text-gray-300">Publisher</label>
+                    </div>
+                    <div className="text-white">{book.publisher || 'Unknown'}</div>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="h-4 w-4 text-green-400" />
+                      <label className="text-sm font-semibold text-gray-300">Publication Year</label>
+                    </div>
+                    <div className="text-white">{book.publicationYear || 'Unknown'}</div>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4 text-orange-400" />
+                      <label className="text-sm font-semibold text-gray-300">Language</label>
+                    </div>
+                    <div className="text-white">{book.language || 'English'}</div>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="h-4 w-4 text-yellow-400" />
+                      <label className="text-sm font-semibold text-gray-300">Pages</label>
+                    </div>
+                    <div className="text-white">{book.pages || 'Unknown'}</div>
+                  </div>
+                  <div className="bg-gray-800/50 p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="h-4 w-4 text-red-400" />
+                      <label className="text-sm font-semibold text-gray-300">Location</label>
+                    </div>
+                    <div className="text-white">
+                      {book.location && typeof book.location === 'object' 
+                        ? `${book.location.shelf || 'Unknown'}, ${book.location.section || 'Unknown'}, Floor ${book.location.floor || 'Unknown'}`
+                        : book.location || 'Main Library'
+                      }
+                    </div>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {book.description && (
+                  <div className="bg-gray-800/30 p-6 rounded-lg border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-3">Description</h3>
+                    <p className="text-gray-200 leading-relaxed">{book.description}</p>
+                  </div>
+                )}
+
+                {/* Rating Section */}
+                {book.reviews?.length > 0 && (
+                  <div className="bg-gray-800/30 p-6 rounded-lg border border-gray-700">
+                    <h3 className="text-lg font-semibold text-white mb-3">Rating & Reviews</h3>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <div className="flex">{renderStars(Math.round(averageRating))}</div>
+                        <span className="text-white font-bold text-xl">{averageRating.toFixed(1)}</span>
+                      </div>
+                      <span className="text-gray-400">({book.reviews.length} review{book.reviews.length !== 1 ? 's' : ''})</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Information */}
+      <div>
+        <Card className="card-elevated border-gray-700/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Shield className="h-5 w-5 text-blue-400" />
+              </div>
+              Additional Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="bg-gray-800/50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray-300 mb-2 block">Book ID</label>
+                <div className="text-white font-mono text-sm break-all">{book._id}</div>
+              </div>
+              <div className="bg-gray-800/50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray-300 mb-2 block">Status</label>
+                <div className="text-white">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    book.isActive ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+                  }`}>
+                    {book.isActive ? '✅ Active' : '❌ Inactive'}
+                  </span>
+                </div>
+              </div>
+              <div className="bg-gray-800/50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray-300 mb-2 block">Borrowing Status</label>
+                <div className="text-white">
+                  {book.availableCopies > 0 ? (
+                    <span className="text-green-400">📚 Available for borrowing</span>
+                  ) : (
+                    <span className="text-red-400">🚫 Currently unavailable</span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-gray-800/50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray-300 mb-2 block">Last Updated</label>
+                <div className="text-white">
+                  {book.updatedAt ? new Date(book.updatedAt).toLocaleDateString() : 'Unknown'}
+                </div>
+              </div>
+              <div className="bg-gray-800/50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray-300 mb-2 block">Shelf Location</label>
+                <div className="text-white">
+                  {book.shelfLocation || 
+                   (book.location && typeof book.location === 'object' 
+                     ? `${book.location.shelf || 'Unknown'}, ${book.location.section || 'Unknown'}, Floor ${book.location.floor || 'Unknown'}`
+                     : book.location || 'Main Library - General Section'
+                   )
+                  }
+                </div>
+              </div>
+              <div className="bg-gray-800/50 p-4 rounded-lg">
+                <label className="text-sm font-semibold text-gray-300 mb-2 block">Condition</label>
+                <div className="text-white">{book.condition || 'Good'}</div>
+              </div>
+            </div>
+
+            {/* Borrowing Guidelines */}
+            <div className="mt-8 p-6 bg-blue-900/20 border border-blue-700/50 rounded-xl">
+              <h4 className="text-lg font-semibold text-blue-300 mb-4 flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                Borrowing Guidelines
+              </h4>
+              <div className="grid gap-3 sm:grid-cols-2 text-sm text-blue-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  Maximum borrowing period: 14 days
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  Renewal allowed: Up to 2 times
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  Late return fine: $0.50 per day
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                  Maximum books per user: 5 books
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Reviews Section */}
+      <div>
+        <Card className="card-elevated border-gray-700/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+              <div className="p-2 bg-yellow-500/20 rounded-lg">
+                <Star className="h-5 w-5 text-yellow-400" />
+              </div>
+              Reviews ({book.reviews?.length || 0})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {book.reviews?.length > 0 ? (
+              <div className="space-y-6">
+                {book.reviews.map((review, index) => (
+                  <div
+                    key={index}
+                    className="bg-gray-800/30 border border-gray-700 rounded-lg p-6"
+                  >
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex">{renderStars(review.rating)}</div>
+                        <span className="text-white font-semibold">{review.rating}/5</span>
+                      </div>
+                      <div className="text-sm text-gray-400">
+                        {review.user?.name || 'Anonymous'} • {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : 'Recently'}
+                      </div>
+                    </div>
+                    <p className="text-gray-200 leading-relaxed">{review.comment}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-400">
+                <Star className="h-16 w-16 mx-auto mb-4 text-gray-600" />
+                <div className="text-xl mb-2 font-semibold">No reviews yet</div>
+                <div className="text-lg">Be the first to review this book!</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

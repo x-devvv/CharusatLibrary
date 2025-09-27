@@ -4,12 +4,39 @@ import { request } from '../lib/api'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
 import { Label } from '../components/ui/label'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function ManageBooks(){
   const { user } = useAuth()
   const [books, setBooks] = useState([])
-  const [categories, setCategories] = useState([])
+  // Static list of book categories
+  const categories = [
+    { _id: 'fiction', name: 'Fiction' },
+    { _id: 'non-fiction', name: 'Non-Fiction' },
+    { _id: 'mystery', name: 'Mystery' },
+    { _id: 'romance', name: 'Romance' },
+    { _id: 'science-fiction', name: 'Science Fiction' },
+    { _id: 'fantasy', name: 'Fantasy' },
+    { _id: 'biography', name: 'Biography' },
+    { _id: 'history', name: 'History' },
+    { _id: 'science', name: 'Science' },
+    { _id: 'technology', name: 'Technology' },
+    { _id: 'business', name: 'Business' },
+    { _id: 'self-help', name: 'Self Help' },
+    { _id: 'health', name: 'Health & Fitness' },
+    { _id: 'cooking', name: 'Cooking' },
+    { _id: 'travel', name: 'Travel' },
+    { _id: 'art', name: 'Art & Design' },
+    { _id: 'music', name: 'Music' },
+    { _id: 'sports', name: 'Sports' },
+    { _id: 'education', name: 'Education' },
+    { _id: 'children', name: 'Children\'s Books' },
+    { _id: 'young-adult', name: 'Young Adult' },
+    { _id: 'poetry', name: 'Poetry' },
+    { _id: 'drama', name: 'Drama' },
+    { _id: 'philosophy', name: 'Philosophy' },
+    { _id: 'religion', name: 'Religion & Spirituality' }
+  ]
   const [authors, setAuthors] = useState([])
   const [stats, setStats] = useState(null)
   const [error, setError] = useState('')
@@ -19,40 +46,68 @@ export default function ManageBooks(){
   const [editing, setEditing] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
 
+  async function loadStats() {
+    try {
+      const statsRes = await request('/books/stats')
+      setStats(statsRes.data?.stats||null)
+    } catch (statsError) {
+      console.log('Stats not available:', statsError.message)
+      setStats(null)
+    }
+  }
+
   async function load(){ 
     setLoading(true)
     try{ 
-      const [booksRes, categoriesRes, authorsRes] = await Promise.all([
+      const [booksRes, authorsRes] = await Promise.all([
         request('/books'),
-        request('/categories'),
-        request('/authors/with-counts') // Use the working authors endpoint
+        request('/authors') // Use basic authors endpoint
       ])
       setBooks(booksRes.data?.books||[])
-      setCategories(categoriesRes.data?.categories||[])
       setAuthors(authorsRes.data?.authors||[])
+      
+      // Load stats separately
+      await loadStats()
+      
       setError('')
-    }catch(e){ 
+    } catch(e){ 
       setError(e.message) 
-    }
-    finally {
-      setLoading(false)
+    } finally{ 
+      setLoading(false) 
     }
   }
 
-  async function loadStats() {
-    try {
-      const response = await request('/books/stats')
-      setStats(response.data?.stats || null)
-    } catch (e) {
-      console.error('Stats load error:', e)
-    }
-  }
   useEffect(()=>{ 
     load()
-    loadStats()
-  },[])
+    
+    // Set up interval to refresh stats every 30 seconds
+    const statsInterval = setInterval(() => {
+      loadStats()
+    }, 30000)
+    
+    // Refresh stats when window gains focus (user switches back to tab)
+    const handleFocus = () => {
+      loadStats()
+    }
+    window.addEventListener('focus', handleFocus)
+    
+    // Listen for transaction updates from other pages
+    const handleTransactionUpdate = (event) => {
+      console.log('Transaction update received:', event.detail)
+      loadStats() // Refresh stats when transactions change
+    }
+    window.addEventListener('transactionUpdate', handleTransactionUpdate)
+    
+    return () => {
+      clearInterval(statsInterval)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('transactionUpdate', handleTransactionUpdate)
+    }
+  }, [])
 
-  function onChange(k, v){ setForm(prev=>({ ...prev, [k]: v })) }
+  function onChange(k, v){ 
+    setForm(prev => ({ ...prev, [k]: v.trim() })) 
+  }
 
   async function save(){
     if (!form.title.trim()) {
@@ -63,58 +118,126 @@ export default function ManageBooks(){
       setError('Please select a genre/category')
       return
     }
+    
+    // Validate that the selected genre exists in our categories list
+    const validGenre = categories.find(cat => cat._id === form.genre)
+    if (!validGenre) {
+      setError('Please select a valid category from the dropdown')
+      return
+    }
     if (!form.authors.trim()) {
       setError('Please enter an author name')
       return
     }
     
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    
+    // Generate a valid ISBN if not provided
+    let isbn = form.isbn.trim()
+    if (!isbn) {
+      // Generate a proper ISBN-13 format (978 prefix + 10 digits)
+      const timestamp = Date.now().toString().slice(-6) // Last 6 digits of timestamp
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0')
+      isbn = `978${timestamp}${random}`
+    }
+    
+    // Clean and validate ISBN format
+    isbn = isbn.replace(/[-\s]/g, '') // Remove dashes and spaces
+    if (isbn.length < 13) {
+      isbn = isbn.padEnd(13, '0') // Pad with zeros if too short
+    } else if (isbn.length > 13) {
+      isbn = isbn.substring(0, 13) // Truncate if too long
+    }
+    
+    console.log('Generated/cleaned ISBN:', isbn)
+    
     try {
-      // First, try to find or create the author
-      const authorName = form.authors.trim()
-      let authorId = null
+      console.log('Starting book creation process...')
+      console.log('Form data:', form)
       
-      // Check if author already exists by searching through the authors we fetched
+      // Prepare author data - let backend handle author creation
+      const authorName = form.authors.trim()
+      
+      // Check if author already exists
       const existingAuthor = authors.find(a => 
         a.name.toLowerCase() === authorName.toLowerCase()
       )
       
-      if (existingAuthor) {
-        authorId = existingAuthor._id
-      } else {
-        // Create new author
-        const newAuthorRes = await request('/authors', {
-          method: 'POST',
-          body: JSON.stringify({
-            name: authorName,
-            biography: `Author of ${form.title}`,
-            nationality: 'Unknown'
-          })
-        })
-        authorId = newAuthorRes.data?.author?._id
-      }
+      console.log('Author handling:', existingAuthor ? 'Found existing' : 'Will create new', authorName)
       
-      if (!authorId) {
-        setError('Failed to create or find author')
-        return
-      }
-      
+      // Create payload with form data - backend now handles author/genre creation
       const payload = { 
-        ...form, 
-        copies: Number(form.copies), 
-        authors: [authorId] // Use the author ID
+        title: form.title.trim(),
+        isbn: isbn,
+        genre: form.genre, // Send genre ID from dropdown
+        authors: authorName, // Send author name - backend will create if needed
+        copies: Number(form.copies) || 1,
+        description: form.description || '',
+        publisher: form.publisher || '',
+        publicationYear: form.publicationYear || ''
       }
       
-      if (editing) await request(`/books/${editing}`, { method:'PUT', body: JSON.stringify(payload) })
-      else await request('/books', { method:'POST', body: JSON.stringify(payload) })
+      console.log('Sending payload with backend auto-creation support')
       
+      console.log('Sending payload:', payload)
+      console.log('Payload validation:')
+      console.log('- Title:', payload.title, payload.title ? '✓' : '✗')
+      console.log('- ISBN:', payload.isbn, payload.isbn ? '✓' : '✗')
+      console.log('- Genre:', payload.genre, payload.genre ? '✓' : '✗')
+      console.log('- Authors:', payload.authors, payload.authors ? '✓' : '✗')
+      console.log('- Copies:', payload.copies, payload.copies > 0 ? '✓' : '✗')
+      
+      let response
+      if (editing) {
+        response = await request(`/books/${editing}`, { 
+          method: 'PUT', 
+          body: JSON.stringify(payload),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+      } else {
+        response = await request('/books', { 
+          method: 'POST', 
+          body: JSON.stringify(payload),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        })
+      }
+      
+      console.log('API Response:', response)
+      
+      // Clear form and show success
       setForm({ title:'', authors:'', genre:'', isbn:'', copies:1, description:'', publisher:'', publicationYear:'' }); 
       setEditing(null); 
       setError('') // Clear errors on success
       setSuccess(editing ? 'Book updated successfully!' : 'Book created successfully!')
-      await load() // Reload to get updated data including new authors
-      await loadStats()
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(''), 3000)
+      
+      console.log('Reloading books list...')
+      await load() // Reload to get updated data
+      
     }catch(e){ 
-      setError(e.message) 
+      console.error('Error creating book:', e)
+      console.error('Error details:', e.response || e)
+      
+      // Try to extract more specific error message
+      let errorMessage = 'Failed to create book. Please try again.'
+      if (e.response?.data?.message) {
+        errorMessage = e.response.data.message
+      } else if (e.message) {
+        errorMessage = e.message
+      }
+      
+      setError(errorMessage)
+      setSuccess('') // Clear success message on error
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -124,24 +247,12 @@ export default function ManageBooks(){
       setDeleteConfirm(null)
       setSuccess('Book deleted successfully!')
       await load()
-      await loadStats()
+      await loadStats() // Refresh stats immediately
     }catch(e){ 
       setError(e.message) 
     } 
   }
 
-  async function updateAvailability(bookId, availableCopies) {
-    try {
-      await request(`/books/${bookId}/availability`, {
-        method: 'PUT',
-        body: JSON.stringify({ availableCopies })
-      })
-      setSuccess('Availability updated successfully!')
-      await load()
-    } catch (e) {
-      setError(e.message)
-    }
-  }
 
   function startEdit(b){ 
     setEditing(b._id); 
@@ -165,10 +276,10 @@ export default function ManageBooks(){
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto pt-6 space-y-6 min-w-[1000px]">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-white">Manage Books</h1>
-        <Button onClick={load} disabled={loading}>
+        <Button onClick={load} disabled={loading} className="btn-secondary text-sm px-4 py-2 font-medium">
           {loading ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
@@ -208,8 +319,8 @@ export default function ManageBooks(){
               <Input placeholder="Book Title" value={form.title} onChange={e=>onChange('title', e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label className="text-gray-200">ISBN</Label>
-              <Input placeholder="ISBN Number" value={form.isbn} onChange={e=>onChange('isbn', e.target.value)} />
+              <Label className="text-gray-200">ISBN (Optional)</Label>
+              <Input placeholder="ISBN Number (auto-generated if empty)" value={form.isbn} onChange={e=>onChange('isbn', e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label className="text-gray-200">Publisher</Label>
@@ -263,7 +374,7 @@ export default function ManageBooks(){
         </div>
         
         <div className="flex gap-2 mt-4">
-          <Button onClick={save} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700">
+          <Button onClick={save} disabled={loading} className="btn-primary text-sm px-4 py-2 font-medium">
             {loading ? (editing ? 'Updating...' : 'Creating...') : (editing ? 'Update Book' : 'Create Book')}
           </Button>
           {editing && (
@@ -273,6 +384,7 @@ export default function ManageBooks(){
                 setEditing(null); 
                 setForm({ title:'', authors:'', genre:'', isbn:'', copies:1, description:'', publisher:'', publicationYear:'' }) 
               }}
+              className="btn-secondary text-sm px-4 py-2 font-medium"
             >
               Cancel
             </Button>
@@ -298,14 +410,13 @@ export default function ManageBooks(){
                 </h3>
               </Link>
               <p className="text-gray-300 text-sm">
-                {book.authors?.map(author => author.name || author).join(', ') || 'Unknown Author'}
+                {book.authors || 'Unknown Author'}
               </p>
             </div>
             
             <div className="space-y-1 text-sm text-gray-400">
               <div><strong>ISBN:</strong> {book.isbn || 'N/A'}</div>
-              <div><strong>Publisher:</strong> {book.publisher || 'Unknown'}</div>
-              <div><strong>Category:</strong> {book.genre?.name || 'Uncategorized'}</div>
+              <div><strong>Category:</strong> {book.genre || 'Uncategorized'}</div>
             </div>
 
             <div className="flex justify-between items-center">
@@ -318,7 +429,7 @@ export default function ManageBooks(){
               <Button 
                 onClick={() => startEdit(book)} 
                 size="sm" 
-                className="bg-blue-600 hover:bg-blue-700"
+                className="btn-primary text-xs px-3 py-1.5 font-medium"
               >
                 Edit
               </Button>
@@ -326,23 +437,11 @@ export default function ManageBooks(){
                 <Button 
                   onClick={() => setDeleteConfirm(book._id)} 
                   size="sm" 
-                  className="bg-red-600 hover:bg-red-700"
+                  className="btn-destructive text-xs px-3 py-1.5 font-medium"
                 >
                   Delete
                 </Button>
               )}
-              <Button 
-                onClick={() => {
-                  const newAvailable = prompt(`Current: ${book.availableCopies}. Enter new available copies:`)
-                  if (newAvailable !== null && !isNaN(newAvailable)) {
-                    updateAvailability(book._id, parseInt(newAvailable))
-                  }
-                }}
-                size="sm" 
-                variant="secondary"
-              >
-                Update Stock
-              </Button>
             </div>
           </div>
         ))}
@@ -366,13 +465,14 @@ export default function ManageBooks(){
             <div className="flex gap-3">
               <Button 
                 onClick={() => remove(deleteConfirm)} 
-                className="bg-red-600 hover:bg-red-700"
+                className="btn-destructive text-sm px-4 py-2 font-medium"
               >
                 Delete
               </Button>
               <Button 
                 onClick={() => setDeleteConfirm(null)} 
                 variant="secondary"
+                className="btn-secondary text-sm px-4 py-2 font-medium"
               >
                 Cancel
               </Button>

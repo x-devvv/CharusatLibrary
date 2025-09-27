@@ -8,6 +8,11 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'sans': ['Inter', 'Mulish', 'sans-serif'],
+        'inter': ['Inter', 'sans-serif'],
+        'mulish': ['Mulish', 'sans-serif'],
+      },
       colors: {
         border: 'hsl(214.3 31.8% 91.4%)',
         input: 'hsl(214.3 31.8% 91.4%)',

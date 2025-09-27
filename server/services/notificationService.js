@@ -58,10 +58,8 @@ class NotificationService {
         return { success: false, error: 'Reservation not found' };
       }
 
-      // Add authorNames to book for email template
-      populatedReservation.bookId.authorNames = populatedReservation.bookId.authors
-        .map(author => author.name)
-        .join(', ');
+      // Authors is now a simple string, no need to map
+      populatedReservation.bookId.authorNames = populatedReservation.bookId.authors;
 
       await emailService.sendReservationNotification(
         populatedReservation.userId,

@@ -8,25 +8,21 @@ const bookSchema = new mongoose.Schema({
     trim: true,
     maxlength: [200, 'Title cannot exceed 200 characters'],
   },
-  authors: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Author',
+  authors: {
+    type: String,
     required: [true, 'At least one author is required'],
-  }],
+    trim: true,
+  },
   isbn: {
     type: String,
     unique: true,
     sparse: true,
     trim: true,
-    match: [
-      /^(?:ISBN(?:-1[03])?:? )?(?=[0-9X]{10}$|(?=(?:[0-9]+[- ]){3})[- 0-9X]{13}$|97[89][0-9]{10}$|(?=(?:[0-9]+[- ]){4})[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$/,
-      'Please enter a valid ISBN',
-    ],
   },
   genre: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
+    type: String,
     required: [true, 'Book genre is required'],
+    trim: true,
   },
   publishDate: {
     type: Date,
@@ -177,12 +173,7 @@ bookSchema.virtual('borrowedCopies').get(function() {
 
 // Virtual for author names
 bookSchema.virtual('authorNames').get(function() {
-  if (this.authors && this.authors.length > 0) {
-    return this.authors.map(author => 
-      typeof author === 'object' ? author.name : author
-    ).join(', ');
-  }
-  return '';
+  return this.authors || '';
 });
 
 // Virtual for current borrowings
@@ -247,6 +238,7 @@ bookSchema.statics.searchBooks = function(query, options = {}) {
   if (query) {
     searchQuery.$or = [
       { title: { $regex: query, $options: 'i' } },
+      { authors: { $regex: query, $options: 'i' } },
       { description: { $regex: query, $options: 'i' } },
       { isbn: { $regex: query, $options: 'i' } },
       { publisher: { $regex: query, $options: 'i' } },
@@ -255,8 +247,8 @@ bookSchema.statics.searchBooks = function(query, options = {}) {
   }
 
   // Filters
-  if (genre) searchQuery.genre = genre;
-  if (author) searchQuery.authors = { $in: [author] };
+  if (genre) searchQuery.genre = { $regex: genre, $options: 'i' };
+  if (author) searchQuery.authors = { $regex: author, $options: 'i' };
   if (availability === 'available') searchQuery.availableCopies = { $gt: 0 };
   if (availability === 'unavailable') searchQuery.availableCopies = 0;
   if (language) searchQuery.language = language;
@@ -266,8 +258,6 @@ bookSchema.statics.searchBooks = function(query, options = {}) {
   sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
   return this.find(searchQuery)
-    .populate('authors', 'name')
-    .populate('genre', 'name color')
     .sort(sort)
     .limit(limit * 1)
     .skip((page - 1) * limit)
@@ -315,14 +305,18 @@ bookSchema.statics.getPopularBooks = async function(limit = 10) {
 
 // Static method to get book statistics
 bookSchema.statics.getStatistics = async function() {
+  const Transaction = require('./Transaction');
+  const config = require('../config/config');
+  
   const totalBooks = await this.countDocuments({ isActive: true });
   const availableBooks = await this.countDocuments({ 
     isActive: true, 
     availableCopies: { $gt: 0 } 
   });
-  const borrowedBooks = await this.countDocuments({ 
-    isActive: true, 
-    availableCopies: 0 
+  
+  // Count actual borrowed transactions instead of books with zero copies
+  const borrowedBooks = await Transaction.countDocuments({ 
+    status: { $in: [config.TRANSACTION_STATUS.BORROWED, config.TRANSACTION_STATUS.OVERDUE] }
   });
 
   const totalCopies = await this.aggregate([

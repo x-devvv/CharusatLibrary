@@ -25,50 +25,33 @@ const connectDB = async () => {
   }
 };
 
-// Sample data
+// Sample data - matches frontend static categories
 const sampleCategories = [
-  {
-    name: 'Fiction',
-    description: 'Fictional literature including novels and short stories',
-    color: '#007bff',
-    icon: 'book',
-    sortOrder: 1,
-  },
-  {
-    name: 'Non-Fiction',
-    description: 'Factual books including biographies, history, and science',
-    color: '#28a745',
-    icon: 'book-open',
-    sortOrder: 2,
-  },
-  {
-    name: 'Science',
-    description: 'Scientific literature and research',
-    color: '#17a2b8',
-    icon: 'flask',
-    sortOrder: 3,
-  },
-  {
-    name: 'Technology',
-    description: 'Books about technology, programming, and computers',
-    color: '#6c757d',
-    icon: 'laptop',
-    sortOrder: 4,
-  },
-  {
-    name: 'History',
-    description: 'Historical books and documentaries',
-    color: '#ffc107',
-    icon: 'clock',
-    sortOrder: 5,
-  },
-  {
-    name: 'Biography',
-    description: 'Life stories of notable people',
-    color: '#dc3545',
-    icon: 'user',
-    sortOrder: 6,
-  },
+  { name: 'Fiction', description: 'Fictional literature including novels and short stories', color: '#007bff', icon: 'book', sortOrder: 1 },
+  { name: 'Non-Fiction', description: 'Factual books including biographies, history, and science', color: '#28a745', icon: 'book-open', sortOrder: 2 },
+  { name: 'Mystery', description: 'Mystery and detective novels', color: '#6f42c1', icon: 'search', sortOrder: 3 },
+  { name: 'Romance', description: 'Romantic fiction and love stories', color: '#e83e8c', icon: 'heart', sortOrder: 4 },
+  { name: 'Science Fiction', description: 'Science fiction and futuristic novels', color: '#17a2b8', icon: 'rocket', sortOrder: 5 },
+  { name: 'Fantasy', description: 'Fantasy and magical fiction', color: '#6610f2', icon: 'magic', sortOrder: 6 },
+  { name: 'Biography', description: 'Life stories of notable people', color: '#dc3545', icon: 'user', sortOrder: 7 },
+  { name: 'History', description: 'Historical books and documentaries', color: '#ffc107', icon: 'clock', sortOrder: 8 },
+  { name: 'Science', description: 'Scientific literature and research', color: '#20c997', icon: 'flask', sortOrder: 9 },
+  { name: 'Technology', description: 'Books about technology, programming, and computers', color: '#6c757d', icon: 'laptop', sortOrder: 10 },
+  { name: 'Business', description: 'Business and entrepreneurship books', color: '#fd7e14', icon: 'briefcase', sortOrder: 11 },
+  { name: 'Self Help', description: 'Self-improvement and personal development', color: '#198754', icon: 'lightbulb', sortOrder: 12 },
+  { name: 'Health & Fitness', description: 'Health, fitness, and wellness books', color: '#0dcaf0', icon: 'heart-pulse', sortOrder: 13 },
+  { name: 'Cooking', description: 'Cookbooks and culinary arts', color: '#f8d7da', icon: 'utensils', sortOrder: 14 },
+  { name: 'Travel', description: 'Travel guides and adventure stories', color: '#d1ecf1', icon: 'plane', sortOrder: 15 },
+  { name: 'Art & Design', description: 'Art, design, and creative books', color: '#f0d0ff', icon: 'palette', sortOrder: 16 },
+  { name: 'Music', description: 'Music theory, history, and biographies', color: '#fff3cd', icon: 'music', sortOrder: 17 },
+  { name: 'Sports', description: 'Sports and athletic books', color: '#d4edda', icon: 'trophy', sortOrder: 18 },
+  { name: 'Education', description: 'Educational and academic books', color: '#cce5ff', icon: 'graduation-cap', sortOrder: 19 },
+  { name: "Children's Books", description: 'Books for children and young readers', color: '#ffccdd', icon: 'child', sortOrder: 20 },
+  { name: 'Young Adult', description: 'Books targeted at young adult readers', color: '#e6ccff', icon: 'users', sortOrder: 21 },
+  { name: 'Poetry', description: 'Poetry collections and verse', color: '#ffe6cc', icon: 'feather', sortOrder: 22 },
+  { name: 'Drama', description: 'Plays and dramatic literature', color: '#ccffe6', icon: 'theater-masks', sortOrder: 23 },
+  { name: 'Philosophy', description: 'Philosophical works and thought', color: '#ffcccc', icon: 'brain', sortOrder: 24 },
+  { name: 'Religion & Spirituality', description: 'Religious and spiritual books', color: '#ccccff', icon: 'pray', sortOrder: 25 }
 ];
 
 const sampleAuthors = [
@@ -156,6 +139,22 @@ const sampleUsers = [
     status: 'active',
     emailVerified: true,
   },
+  {
+    name: 'Bob Student',
+    email: 'student@library.com',
+    password: 'Student@123456',
+    role: 'member',
+    phone: '+1-555-0004',
+    address: {
+      street: '321 Study St',
+      city: 'Booktown',
+      state: 'CA',
+      zipCode: '90210',
+      country: 'USA',
+    },
+    status: 'active',
+    emailVerified: true,
+  },
 ];
 
 // Seed functions
@@ -211,7 +210,7 @@ const seedBooks = async (categories, authors) => {
     const sampleBooks = [
       {
         title: "Harry Potter and the Philosopher's Stone",
-        authors: [authors.find(a => a.name === 'J.K. Rowling')._id],
+        authors: 'J.K. Rowling',
         isbn: '9780747532699',
         genre: categories.find(c => c.name === 'Fiction')._id,
         publishDate: new Date('1997-06-26'),
@@ -231,7 +230,7 @@ const seedBooks = async (categories, authors) => {
       },
       {
         title: '1984',
-        authors: [authors.find(a => a.name === 'George Orwell')._id],
+        authors: 'George Orwell',
         isbn: '9780451524935',
         genre: categories.find(c => c.name === 'Fiction')._id,
         publishDate: new Date('1949-06-08'),
@@ -251,7 +250,7 @@ const seedBooks = async (categories, authors) => {
       },
       {
         title: 'The Shining',
-        authors: [authors.find(a => a.name === 'Stephen King')._id],
+        authors: 'Stephen King',
         isbn: '9780307743657',
         genre: categories.find(c => c.name === 'Fiction')._id,
         publishDate: new Date('1977-01-28'),
@@ -271,7 +270,7 @@ const seedBooks = async (categories, authors) => {
       },
       {
         title: 'Murder on the Orient Express',
-        authors: [authors.find(a => a.name === 'Agatha Christie')._id],
+        authors: 'Agatha Christie',
         isbn: '9780062693662',
         genre: categories.find(c => c.name === 'Fiction')._id,
         publishDate: new Date('1934-01-01'),
@@ -291,7 +290,7 @@ const seedBooks = async (categories, authors) => {
       },
       {
         title: 'Foundation',
-        authors: [authors.find(a => a.name === 'Isaac Asimov')._id],
+        authors: 'Isaac Asimov',
         isbn: '9780553293357',
         genre: categories.find(c => c.name === 'Science')._id,
         publishDate: new Date('1951-05-01'),
@@ -344,6 +343,7 @@ const seedDatabase = async () => {
     console.log('   Admin: admin@library.com / Admin@123456');
     console.log('   Librarian: librarian@library.com / Librarian@123456');
     console.log('   Member: member@library.com / Member@123456');
+    console.log('   Student: student@library.com / Student@123456');
     
     console.log('\n🚀 You can now start the server with: npm run dev');
     

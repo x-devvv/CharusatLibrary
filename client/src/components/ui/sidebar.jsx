@@ -136,21 +136,32 @@ export const MobileSidebar = ({ className, children, ...props }) => {
   );
 };
 
-export const SidebarLink = ({ link, className, ...props }) => {
+export const SidebarLink = ({ link, isActive = false, className, ...props }) => {
   const { open, animate } = useSidebar();
   return (
     <div
       className={cn(
-        "flex items-center gap-3 group/sidebar py-3 px-3 cursor-pointer hover:bg-gray-800/50 rounded-lg transition-all duration-200 justify-start",
+        "flex items-center gap-3 group/sidebar py-3 px-3 cursor-pointer rounded-lg transition-all duration-200 justify-start",
+        isActive 
+          ? "bg-blue-600/20 border border-blue-500/30 text-blue-300 shadow-lg shadow-blue-500/10" 
+          : "hover:bg-gray-800/50 text-gray-200",
         className
       )}
       {...props}
     >
       <div className="flex-shrink-0 flex items-center justify-center">
-        {link.icon}
+        {React.cloneElement(link.icon, {
+          className: cn(
+            link.icon.props.className,
+            isActive ? "text-blue-400" : "text-gray-200 group-hover:text-gray-100"
+          )
+        })}
       </div>
 
-      <span className="text-gray-200 text-sm font-medium whitespace-nowrap">
+      <span className={cn(
+        "text-sm font-medium whitespace-nowrap",
+        isActive ? "text-blue-300" : "text-gray-200 group-hover:text-gray-100"
+      )}>
         {link.label}
       </span>
     </div>

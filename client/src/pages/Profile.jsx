@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { request } from '../lib/api'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar'
 import ChangePassword from '../components/ChangePassword'
+import { 
+  User, Mail, Phone, MapPin, Calendar, Shield, Edit, Save, X, 
+  CheckCircle, XCircle, RefreshCw, UserCheck, Settings
+} from 'lucide-react'
 
 export default function Profile(){
   const [user, setUser] = useState(null)
@@ -85,27 +93,121 @@ export default function Profile(){
       case 'admin': return 'text-red-400 bg-red-900/30'
       case 'librarian': return 'text-blue-400 bg-blue-900/30'
       case 'member': return 'text-green-400 bg-green-900/30'
+      case 'student': return 'text-purple-400 bg-purple-900/30'
       default: return 'text-gray-400 bg-gray-900/30'
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {error && <div className="rounded-md border border-red-400 bg-red-900/30 p-3 text-sm text-red-200">{error}</div>}
-      {success && <div className="rounded-md border border-green-400 bg-green-900/30 p-3 text-sm text-green-200">{success}</div>}
+    <div className="max-w-4xl mx-auto space-y-8 min-w-[800px]">
+      {/* Professional Header */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-10"
+      >
+        <div className="flex justify-between items-start mb-8">
+          <div className="space-y-4">
+            <h1 className="text-4xl font-semibold text-white">
+              User Profile
+            </h1>
+            <p className="text-xl text-gray-300 font-medium">
+              Manage your personal information and account settings
+            </p>
+            <div className="flex items-center gap-6 text-sm text-gray-400">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Account Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Secure Profile</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                <span className="font-medium">Personalized</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Button 
+              onClick={() => setEditing(!editing)}
+              variant="outline" 
+              className="btn-secondary flex items-center space-x-2"
+            >
+              {editing ? (
+                <>
+                  <X className="h-4 w-4" />
+                  <span>Cancel</span>
+                </>
+              ) : (
+                <>
+                  <Edit className="h-4 w-4" />
+                  <span>Edit Profile</span>
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Alerts */}
+      {error && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="relative"
+        >
+          <div className="absolute inset-0 bg-red-500/10 rounded-xl blur-sm"></div>
+          <div className="relative bg-red-900/20 backdrop-blur-sm border border-red-500/30 rounded-xl p-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <XCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-200">{error}</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {success && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="relative"
+        >
+          <div className="absolute inset-0 bg-green-500/10 rounded-xl blur-sm"></div>
+          <div className="relative bg-green-900/20 backdrop-blur-sm border border-green-500/30 rounded-xl p-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-200">{success}</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
       
       {/* Profile Information */}
-      <div className="bg-gray-900/30 backdrop-blur-sm rounded-lg border border-gray-700 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-white">Profile Information</h2>
-          <Button
-            onClick={() => setEditing(!editing)}
-            variant={editing ? "secondary" : "default"}
-            className={editing ? "" : "bg-indigo-600 hover:bg-indigo-700"}
-          >
-            {editing ? 'Cancel' : 'Edit Profile'}
-          </Button>
-        </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
+        <Card className="card-elevated border-gray-700/30">
+          <CardHeader className="pb-6">
+            <CardTitle className="flex items-center gap-3 text-white text-xl font-semibold">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <User className="h-5 w-5 text-blue-400" />
+              </div>
+              Profile Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
 
         {!editing ? (
           <div className="grid gap-6 md:grid-cols-2">
@@ -240,7 +342,7 @@ export default function Profile(){
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-700"
+                className="btn-primary"
               >
                 {loading ? 'Updating...' : 'Update Profile'}
               </Button>
@@ -248,13 +350,16 @@ export default function Profile(){
                 type="button"
                 variant="secondary"
                 onClick={() => setEditing(false)}
+                className="btn-secondary"
               >
                 Cancel
               </Button>
             </div>
           </form>
         )}
-      </div>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Change Password Section */}
       <ChangePassword />

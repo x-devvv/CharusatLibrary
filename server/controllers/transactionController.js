@@ -122,7 +122,8 @@ const getTransaction = asyncHandler(async (req, res, next) => {
 // @route   POST /api/transactions/borrow
 // @access  Private
 const borrowBook = asyncHandler(async (req, res, next) => {
-  const { userId, bookId, dueDate } = req.body;
+  const { bookId, dueDate } = req.body;
+  const userId = req.user._id; // Get user ID from authenticated user
 
   // Validate user exists and is active
   const user = await User.findById(userId);
@@ -130,13 +131,7 @@ const borrowBook = asyncHandler(async (req, res, next) => {
     return next(createErrorResponse('RESOURCE_NOT_FOUND', 'User not found or inactive'));
   }
 
-  // Check if user can borrow (only members can borrow, or staff can borrow for members)
-  const canBorrow = req.user._id.toString() === userId || 
-                   [config.USER_ROLES.ADMIN, config.USER_ROLES.LIBRARIAN].includes(req.user.role);
-  
-  if (!canBorrow) {
-    return next(createErrorResponse('ACCESS_DENIED_TRANSACTION'));
-  }
+  // All authenticated users can borrow books for themselves
 
   // Validate book exists and is available
   const book = await Book.findById(bookId);
@@ -490,14 +485,7 @@ const getUserActiveTransactions = asyncHandler(async (req, res, next) => {
     userId,
     status: { $in: [config.TRANSACTION_STATUS.BORROWED, config.TRANSACTION_STATUS.OVERDUE] },
   })
-  .populate('bookId', 'title isbn authors coverImage')
-  .populate({
-    path: 'bookId',
-    populate: {
-      path: 'authors',
-      select: 'name',
-    },
-  })
+  .populate('bookId', 'title isbn authors coverImage genre')
   .sort({ borrowDate: -1 });
 
   res.status(200).json({

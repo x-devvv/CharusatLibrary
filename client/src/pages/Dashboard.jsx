@@ -19,7 +19,7 @@ export default function Dashboard(){
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 space-y-6">
+    <div className="mx-auto max-w-6xl px-4 py-8 space-y-6 min-w-[800px]">
       {error && <div className="rounded-md border border-red-600 bg-red-900/30 p-3 text-sm">{error}</div>}
 
       <Card>

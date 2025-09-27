@@ -236,18 +236,33 @@ transactionSchema.statics.getStatistics = async function(startDate, endDate) {
     },
   ]);
 
+  // Calculate values for frontend
+  const statusCounts = stats.reduce((acc, stat) => {
+    acc[stat._id] = {
+      count: stat.count,
+      totalFines: stat.totalFines,
+      paidFines: stat.paidFines,
+    };
+    return acc;
+  }, {});
+
+  const activeBorrows = (statusCounts[config.TRANSACTION_STATUS.BORROWED]?.count || 0) + 
+                       (statusCounts[config.TRANSACTION_STATUS.OVERDUE]?.count || 0);
+  
+  const totalFines = stats.reduce((sum, stat) => sum + (stat.totalFines || 0), 0);
+
   return {
+    // Original format for backward compatibility
     total: totalTransactions,
     overdue: overdueTransactions,
-    byStatus: stats.reduce((acc, stat) => {
-      acc[stat._id] = {
-        count: stat.count,
-        totalFines: stat.totalFines,
-        paidFines: stat.paidFines,
-      };
-      return acc;
-    }, {}),
+    byStatus: statusCounts,
     popularBooks,
+    
+    // Frontend expected format
+    totalTransactions: totalTransactions,
+    activeBorrows: activeBorrows,
+    overdueBooks: overdueTransactions,
+    totalFines: totalFines,
   };
 };
 

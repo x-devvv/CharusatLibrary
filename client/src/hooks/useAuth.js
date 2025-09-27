@@ -4,13 +4,26 @@ import { request } from '../lib/api'
 export function useAuth(){
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  
   useEffect(()=>{
     (async()=>{
       const token = localStorage.getItem('access_token')
-      if (!token) { setLoading(false); return }
-      try{ const r = await request('/auth/profile'); setUser(r.data?.user||null) } catch(_){ /* ignore */ }
+      if (!token) { 
+        setLoading(false); 
+        return 
+      }
+      try{ 
+        const r = await request('/auth/profile'); 
+        setUser(r.data?.user||null) 
+      } catch(_){ 
+        // If profile request fails, clear invalid token
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        setUser(null)
+      }
       finally{ setLoading(false) }
     })()
   },[])
+  
   return { user, setUser, loading }
 }

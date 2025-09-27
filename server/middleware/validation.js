@@ -150,19 +150,22 @@ const bookValidations = {
       .withMessage('Title must be between 1 and 200 characters')
       .trim(),
     body('authors')
-      .isArray({ min: 1 })
+      .notEmpty()
       .withMessage('At least one author is required')
-      .custom((authors) => {
-        return authors.every(author => mongoose.Types.ObjectId.isValid(author));
-      })
-      .withMessage('All author IDs must be valid'),
+      .isString()
+      .withMessage('Author must be a string')
+      .trim(),
     body('isbn')
       .optional()
-      .matches(/^(?:ISBN(?:-1[03])?:? )?(?=[0-9X]{10}$|(?=(?:[0-9]+[- ]){3})[- 0-9X]{13}$|97[89][0-9]{10}$|(?=(?:[0-9]+[- ]){4})[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$/)
-      .withMessage('Please provide a valid ISBN'),
+      .isString()
+      .withMessage('ISBN must be a string')
+      .trim(),
     body('genre')
-      .isMongoId()
-      .withMessage('Valid genre ID is required'),
+      .notEmpty()
+      .withMessage('Genre is required')
+      .isString()
+      .withMessage('Genre must be a string')
+      .trim(),
     body('publishDate')
       .optional()
       .isISO8601()
@@ -198,20 +201,19 @@ const bookValidations = {
       .trim(),
     body('authors')
       .optional()
-      .isArray({ min: 1 })
-      .withMessage('At least one author is required')
-      .custom((authors) => {
-        return authors.every(author => mongoose.Types.ObjectId.isValid(author));
-      })
-      .withMessage('All author IDs must be valid'),
+      .isString()
+      .withMessage('Author must be a string')
+      .trim(),
     body('isbn')
       .optional()
-      .matches(/^(?:ISBN(?:-1[03])?:? )?(?=[0-9X]{10}$|(?=(?:[0-9]+[- ]){3})[- 0-9X]{13}$|97[89][0-9]{10}$|(?=(?:[0-9]+[- ]){4})[- 0-9]{17}$)(?:97[89][- ]?)?[0-9]{1,5}[- ]?[0-9]+[- ]?[0-9]+[- ]?[0-9X]$/)
-      .withMessage('Please provide a valid ISBN'),
+      .isString()
+      .withMessage('ISBN must be a string')
+      .trim(),
     body('genre')
       .optional()
-      .isMongoId()
-      .withMessage('Valid genre ID is required'),
+      .isString()
+      .withMessage('Genre must be a string')
+      .trim(),
     body('copies')
       .optional()
       .isInt({ min: 0 })
@@ -223,12 +225,14 @@ const bookValidations = {
     ...commonValidations.pagination,
     query('genre')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid genre ID'),
+      .isString()
+      .trim()
+      .withMessage('Genre must be a string'),
     query('author')
       .optional()
-      .isMongoId()
-      .withMessage('Invalid author ID'),
+      .isString()
+      .trim()
+      .withMessage('Author must be a string'),
     query('availability')
       .optional()
       .isIn(['available', 'unavailable'])
@@ -345,9 +349,6 @@ const categoryValidations = {
 // Transaction validation rules
 const transactionValidations = {
   borrow: [
-    body('userId')
-      .isMongoId()
-      .withMessage('Valid user ID is required'),
     body('bookId')
       .isMongoId()
       .withMessage('Valid book ID is required'),
