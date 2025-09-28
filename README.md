@@ -675,16 +675,14 @@ docker-compose -f docker-compose.prod.yml -f docker-compose.ssl.yml up -d
   <table>
     <tr>
       <td align="center">
-        <img src="https://github.com/devvadariya.png" width="100" alt="Dev Vadariya" /><br/>
         <sub><b>Dev Vadariya</b></sub><br/>
         <small>Team Lead & Full‑Stack</small><br/>
-        <small>Architecture, Backend, Auth, DB Design</small>
+        <small>Architecture,React, Backend, Auth, DB Design</small>
       </td>
       <td align="center">
-        <img src="https://github.com/dhyeythummar.png" width="100" alt="Dhyey Thummar" /><br/>
         <sub><b>Dhyey Thummar</b></sub><br/>
         <small>Frontend & UI/UX</small><br/>
-        <small>React, Responsive UI, Animations, QA</small>
+        <small>Responsive UI, Animations, QA</small>
       </td>
     </tr>
   </table>
@@ -742,22 +740,6 @@ docker-compose -f docker-compose.prod.yml -f docker-compose.ssl.yml up -d
 
 </div>
 
-<h3 id="-license">📄 License</h3>
-
-<div align="center">
-
-<p>This project is licensed under the <strong>MIT License</strong>.</p>
-
-<pre><code>MIT License
-
-Copyright (c) 2024 CHARUSAT
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-...
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
-</code></pre>
-
-</div>
 
 <hr/>
 
